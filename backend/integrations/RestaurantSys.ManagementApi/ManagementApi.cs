@@ -33,6 +33,7 @@ namespace RestaurantSys.Api
                 }
             });
 
+            // Add new menu
             app.MapPost("/api/menus", async (HttpRequest req, NpgsqlDataSource db) =>
             {
                 try
@@ -64,7 +65,7 @@ namespace RestaurantSys.Api
                 }
             });
 
-            // 
+            // Delete menu by num
             app.MapDelete("/api/menus/{menuNum:int}", async (int menuNum, NpgsqlDataSource db) =>
             {
                 try
@@ -119,6 +120,62 @@ namespace RestaurantSys.Api
                 }
             });
 
+            app.MapPatch("/api/menus/{menuNum:int}", async (int menuNum, UpdateMenuPayload payload, NpgsqlDataSource db) =>
+            {
+                try
+                {
+                    var name = (payload?.Name ?? "").Trim();
+                    if (name.Length == 0) return Results.BadRequest(new { error = "Name is required." });
+
+                    await using var conn = await db.OpenConnectionAsync();
+                    await using var tx = await conn.BeginTransactionAsync();
+
+                    // Optional existence check (or rely on affected row == 0 below)
+
+                    const string sql = """
+        update menus
+        set name = @name
+        where menu_num = @menu_num
+        returning menu_num, name;
+        """;
+
+                    int outMenuNum;
+                    string outName;
+
+                    await using (var cmd = new NpgsqlCommand(sql, conn, tx))
+                    {
+                        cmd.Parameters.AddWithValue("name", name);
+                        cmd.Parameters.AddWithValue("menu_num", menuNum);
+
+                        // Limit to one row and ensure reader is disposed before COMMIT
+                        await using var reader = await cmd.ExecuteReaderAsync(System.Data.CommandBehavior.SingleRow);
+
+                        if (!await reader.ReadAsync())
+                        {
+                            await tx.RollbackAsync();
+                            return Results.NotFound(new { error = "Menu not found." });
+                        }
+
+                        outMenuNum = reader.GetInt32(0);
+                        outName = reader.GetString(1);
+                        // reader disposed at the end of this using block
+                    }
+
+                    await tx.CommitAsync();
+
+                    return Results.Ok(new { menuNum = outMenuNum, name = outName });
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("Error in Patch /api/menus:");
+                    Console.Error.WriteLine(ex);
+                    return Results.Problem($"PATCH /api/menus failed: {ex.Message}", statusCode: 500);
+                }
+
+            });
+
+
+
             /* ========== MENU NODES (TREE) ========== */
 
             app.MapGet("/api/menu-nodes", async (HttpRequest req, NpgsqlDataSource db) =>
@@ -129,12 +186,12 @@ namespace RestaurantSys.Api
                     return Results.BadRequest(new { error = "Missing or invalid ?menu= partition number" });
 
                 const string sql = """
-    select
-      node_id, parent_id, name, is_leaf, layer, sort_order, price_cents, menu_num
-    from public.menu_nodes
-    where menu_num = @m
-    order by coalesce(parent_id,'00000000-0000-0000-0000-000000000000'), sort_order, name;
-    """;
+                select
+                node_id, parent_id, name, is_leaf, layer, sort_order, price_cents, menu_num
+                from public.menu_nodes
+                where menu_num = @m
+                order by coalesce(parent_id,'00000000-0000-0000-0000-000000000000'), sort_order, name;
+                """;
 
                 var all = new List<MenuNodeDto>();
                 await using (var cmd = db.CreateCommand(sql))

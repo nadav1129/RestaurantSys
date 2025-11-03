@@ -269,22 +269,27 @@ export default function MenuPage() {
   }
 }
 
-  async function handleRenameMenu() {
-    if (!selectedMenu) return;
-    const current = menus.find((m) => m.menuNum === selectedMenu)?.name ?? "";
-    const name = window.prompt("New menu name?", current);
-    if (!name || !name.trim()) return;
-    try {
-      await apiFetch(`/api/menus/${selectedMenu}`, {
-        method: "PATCH",
-        body: JSON.stringify({ name: name.trim() }),
-      });
-      setMenus((ms) => ms.map((m) => (m.menuNum === selectedMenu ? { ...m, name: name.trim() } : m)));
-    } catch (e) {
-      console.error("Rename menu failed", e);
-      alert("Rename failed");
-    }
+  async function handleRenameMenu(nextName: string) {
+  if (!selectedMenu) return;
+  const name = nextName.trim();
+  if (!name) return; // or show a toast
+
+  try {
+    const updated = await apiFetch(`/api/menus/${selectedMenu}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    setMenus((prev) =>
+      prev.map((m) =>
+        m.menuNum === updated.menuNum ? { ...m, name: updated.name } : m
+      )
+    );
+  } catch (e) {
+    console.error("Rename menu failed", e);
   }
+}
 
   /* Handles the deletion of a menu - request the api to delete the menu from menus */
   async function handleDeleteMenu() {
@@ -473,7 +478,11 @@ async function handleCreateNode() {
         + New Menu
       </button>
       <button
-        onClick={handleRenameMenu}
+        onClick={() => {
+    const name = window.prompt("New name?")?.trim() || "";
+    if (!name) return;
+    void handleRenameMenu(name);
+  }}
         disabled={!selectedMenu}
         className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
       >

@@ -17,7 +17,10 @@ namespace RestaurantSys.Api
         public string? Name { get; set; }
     }
 
-
+    public sealed class UpdateMenuPayload
+    {
+        public string? Name { get; set; }
+    }
 
 
     /* ============ MENU TREE ============ */
