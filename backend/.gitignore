@@ -1,0 +1,21 @@
+# .NET build output
+bin/
+obj/
+*.user
+*.suo
+*.cache/
+*.ide/
+*.db
+
+# Rider / VS Code
+.idea/
+.vscode/
+
+# Packages
+*.nupkg
+*.snupkg
+
+# Misc
+*.swp
+*.tmp
+*.bak
