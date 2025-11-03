@@ -25,11 +25,11 @@ namespace RestaurantSys.Api
                         list.Add(new MenuDto { MenuNum = r.GetInt32(0), Name = r.GetString(1) });
                     return Results.Json(list);
                 }
-                catch (Exception ex) 
+                catch (Exception ex)
                 {
-                        Console.Error.WriteLine("Error in GET /api/menus:");
-                        Console.Error.WriteLine(ex);
-                        return Results.Problem($"GET /api/menus failed: {ex.Message}", statusCode: 500);
+                    Console.Error.WriteLine("Error in GET /api/menus:");
+                    Console.Error.WriteLine(ex);
+                    return Results.Problem($"GET /api/menus failed: {ex.Message}", statusCode: 500);
                 }
             });
 
@@ -64,57 +64,71 @@ namespace RestaurantSys.Api
                 }
             });
 
-            /* ========== MENU NODES (TREE) ========== */
-            //app.MapGet("/api/menu-nodes", async (NpgsqlDataSource db) =>
-            //{
-            //    const string sql = @"
-            //        select node_id, parent_id, name, is_leaf
-            //        from menu_nodes;
-            //    ";
-
-            //    var flat = new List<MenuNodeDto>();
-
-            //    await using (var cmd = db.CreateCommand(sql))
-            //    await using (var reader = await cmd.ExecuteReaderAsync())
-            //    {
-            //        while (await reader.ReadAsync())
-            //        {
-            //            flat.Add(new MenuNodeDto
-            //            {
-            //                Id = reader.GetGuid(0),
-            //                ParentId = reader.IsDBNull(1) ? (Guid?)null : reader.GetGuid(1),
-            //                Name = reader.GetString(2),
-            //                IsLeaf = reader.GetBoolean(3),
-            //                Children = new List<MenuNodeDto>()
-            //            });
-            //        }
-            //    }
-
-            //    // build hierarchy
-            //    var byId = new Dictionary<Guid, MenuNodeDto>();
-            //    foreach (var n in flat)
-            //        byId[n.Id] = n;
-
-            //    var roots = new List<MenuNodeDto>();
-            //    foreach (var n in flat)
-            //    {
-            //        if (n.ParentId is Guid pid && byId.TryGetValue(pid, out var parent))
-            //            parent.Children.Add(n);
-            //        else
-            //            roots.Add(n);
-            //    }
-
-            //    return Results.Json(roots);
-            //});
-
-            app.MapGet("/api/menu-nodes", async (HttpRequest req, NpgsqlDataSource db) =>
+            // 
+            app.MapDelete("/api/menus/{menuNum:int}", async (int menuNum, NpgsqlDataSource db) =>
             {
                 try
                 {
-                    if (!int.TryParse(req.Query["menu"], out var menuNum))
-                        return Results.BadRequest(new { error = "Missing or invalid ?menu= partition number" });
+                    await using var conn = await db.OpenConnectionAsync();
+                    await using var tx = await conn.BeginTransactionAsync();
 
-                    const string sql = """
+                    // Ensure menu exists 
+                    await using (var check = new NpgsqlCommand(
+                        "select 1 from menus where menu_num = @menu_num limit 1;", conn, tx))
+                    {
+                        check.Parameters.AddWithValue("menu_num", menuNum);
+                        var exists = await check.ExecuteScalarAsync();
+                        if (exists is null)
+                        {
+                            await tx.RollbackAsync();
+                            return Results.NotFound(new { error = "Menu not found." });
+                        }
+                    }
+                    // Delete all nodes that belong to this menu (if you don't already rely on FK CASCADE)
+                    await using (var delNodes = new NpgsqlCommand(
+                        "delete from menu_nodes where menu_num = @menu_num;", conn, tx))
+                    {
+                        delNodes.Parameters.AddWithValue("menu_num", menuNum);
+                        await delNodes.ExecuteNonQueryAsync();
+                    }
+
+                    // Delete the menu row itself
+                    var affected = 0;
+                    await using (var delMenu = new NpgsqlCommand(
+                        "delete from menus where menu_num = @menu_num;", conn, tx))
+                    {
+                        delMenu.Parameters.AddWithValue("menu_num", menuNum);
+                        affected = await delMenu.ExecuteNonQueryAsync();
+                    }
+
+                    if (affected == 0)
+                    {
+                        await tx.RollbackAsync();
+                        return Results.NotFound(new { error = "Menu not found." });
+                    }
+
+                    await tx.CommitAsync();
+                    return Results.NoContent();
+
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("Error in Delete /api/menus:");
+                    Console.Error.WriteLine(ex);
+                    return Results.Problem($"POST /api/menus failed: {ex.Message}", statusCode: 500);
+                }
+            });
+
+            /* ========== MENU NODES (TREE) ========== */
+
+            app.MapGet("/api/menu-nodes", async (HttpRequest req, NpgsqlDataSource db) =>
+        {
+            try
+            {
+                if (!int.TryParse(req.Query["menu"], out var menuNum))
+                    return Results.BadRequest(new { error = "Missing or invalid ?menu= partition number" });
+
+                const string sql = """
     select
       node_id, parent_id, name, is_leaf, layer, sort_order, price_cents, menu_num
     from public.menu_nodes
@@ -122,55 +136,55 @@ namespace RestaurantSys.Api
     order by coalesce(parent_id,'00000000-0000-0000-0000-000000000000'), sort_order, name;
     """;
 
-                    var all = new List<MenuNodeDto>();
-                    await using (var cmd = db.CreateCommand(sql))
-                    {
-                        cmd.Parameters.AddWithValue("@m", NpgsqlTypes.NpgsqlDbType.Integer, menuNum);
-                        await using var reader = await cmd.ExecuteReaderAsync();
-                        while (await reader.ReadAsync())
-                        {
-                            all.Add(new MenuNodeDto
-                            {
-                                Id = reader.GetGuid(0),
-                                ParentId = reader.IsDBNull(1) ? (Guid?)null : reader.GetGuid(1),
-                                Name = reader.GetString(2),
-                                IsLeaf = reader.GetBoolean(3),
-                                Layer = reader.GetInt32(4),
-                                SortOrder = reader.GetInt32(5),
-                                PriceCents = reader.IsDBNull(6) ? (int?)null : reader.GetInt32(6),
-                                MenuNum = reader.GetInt32(7),
-                                Children = new List<MenuNodeDto>()
-                            });
-                        }
-                    }
-
-                    var byId = all.ToDictionary(n => n.Id);
-                    foreach (var n in all)
-                        if (n.ParentId is Guid pid && byId.TryGetValue(pid, out var parent))
-                            parent.Children.Add(n);
-
-                    var root = all.FirstOrDefault(n => n.Layer == 0 && n.ParentId is null);
-                    if (root is null) return Results.Ok(Array.Empty<MenuNodeDto>());
-
-                    void SortRec(MenuNodeDto node)
-                    {
-                        node.Children = node.Children
-                            .OrderBy(c => c.SortOrder)
-                            .ThenBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
-                            .ToList();
-                        foreach (var c in node.Children) SortRec(c);
-                    }
-                    SortRec(root);
-
-                    return Results.Ok(root.Children);
-                }
-                catch (Exception ex)
+                var all = new List<MenuNodeDto>();
+                await using (var cmd = db.CreateCommand(sql))
                 {
-                    Console.Error.WriteLine("Error in Get /api/menu-nodes:");
-                    Console.Error.WriteLine(ex);
-                    return Results.Problem($"Get /api/menu-nodes failed: {ex.Message}", statusCode: 500);
+                    cmd.Parameters.AddWithValue("@m", NpgsqlTypes.NpgsqlDbType.Integer, menuNum);
+                    await using var reader = await cmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        all.Add(new MenuNodeDto
+                        {
+                            Id = reader.GetGuid(0),
+                            ParentId = reader.IsDBNull(1) ? (Guid?)null : reader.GetGuid(1),
+                            Name = reader.GetString(2),
+                            IsLeaf = reader.GetBoolean(3),
+                            Layer = reader.GetInt32(4),
+                            SortOrder = reader.GetInt32(5),
+                            PriceCents = reader.IsDBNull(6) ? (int?)null : reader.GetInt32(6),
+                            MenuNum = reader.GetInt32(7),
+                            Children = new List<MenuNodeDto>()
+                        });
+                    }
                 }
-            });
+
+                var byId = all.ToDictionary(n => n.Id);
+                foreach (var n in all)
+                    if (n.ParentId is Guid pid && byId.TryGetValue(pid, out var parent))
+                        parent.Children.Add(n);
+
+                var root = all.FirstOrDefault(n => n.Layer == 0 && n.ParentId is null);
+                if (root is null) return Results.Ok(Array.Empty<MenuNodeDto>());
+
+                void SortRec(MenuNodeDto node)
+                {
+                    node.Children = node.Children
+                        .OrderBy(c => c.SortOrder)
+                        .ThenBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    foreach (var c in node.Children) SortRec(c);
+                }
+                SortRec(root);
+
+                return Results.Ok(root.Children);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Error in Get /api/menu-nodes:");
+                Console.Error.WriteLine(ex);
+                return Results.Problem($"Get /api/menu-nodes failed: {ex.Message}", statusCode: 500);
+            }
+        });
 
 
 
@@ -296,7 +310,7 @@ namespace RestaurantSys.Api
                         return Results.Json(dto);
                     }
                 }
-                catch (Exception ex) 
+                catch (Exception ex)
                 {
                     Console.Error.WriteLine("Error in POST menu-nodes:");
                     Console.Error.WriteLine(ex);

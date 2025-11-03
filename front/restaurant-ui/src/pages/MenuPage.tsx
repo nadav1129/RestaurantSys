@@ -286,6 +286,7 @@ export default function MenuPage() {
     }
   }
 
+  /* Handles the deletion of a menu - request the api to delete the menu from menus */
   async function handleDeleteMenu() {
     if (!selectedMenu) return;
     if (!window.confirm("Delete this menu? This cannot be undone.")) return;
