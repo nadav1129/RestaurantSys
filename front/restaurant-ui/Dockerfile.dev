@@ -1,0 +1,8 @@
+FROM node:20
+WORKDIR /app
+EXPOSE 5173
+ENV HOST=0.0.0.0
+COPY package*.json ./
+RUN npm ci
+# Code mounted by docker-compose for HMR
+CMD ["npm","run","dev","--","--host"]

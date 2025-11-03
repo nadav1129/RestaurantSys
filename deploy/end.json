@@ -1,0 +1,13 @@
+{
+  "entry": [{
+    "changes": [{
+      "value": {
+        "messages": [{
+          "id": "wamid.LOCAL_TEST_2",
+          "from": "+972549537630",
+          "text": { "body": "end" }
+        }]
+      }
+    }]
+  }]
+}

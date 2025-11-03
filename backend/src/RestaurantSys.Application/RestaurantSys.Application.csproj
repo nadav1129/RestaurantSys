@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup><ItemGroup><ProjectReference Include="..\RestaurantSys.Domain\RestaurantSys.Domain.csproj" /></ItemGroup><ItemGroup>
+  <PackageReference Include="ClosedXML" Version="0.105.0" />
+  <PackageReference Include="Npgsql" Version="9.0.4" />
+</ItemGroup></Project>
