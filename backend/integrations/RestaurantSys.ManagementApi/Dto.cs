@@ -59,46 +59,50 @@ namespace RestaurantSys.Api
         public int? PriceCents { get; set; }
 
         [JsonPropertyName("parentId")]
-        public Guid? ParentId { get; set; }   
+        public Guid? ParentId { get; set; }
     }
 
 
 
-    /* ============ PRODUCTS LIST ============ */
+    /* ============ PRODUCTS (LIST + CREATE) ============ */
     public sealed class ProductListItemDto
     {
         public Guid Id { get; set; }
-        public string Name { get; set; } = "";
-        public string Type { get; set; } = ""; /* "Bottle" / "Cocktail" / etc */
-        public decimal? Price { get; set; }     /* from Catalog.PriceByProductId */
+        public string Name { get; set; } = default!;
+        public string Type { get; set; } = default!;
+        public int? Price { get; set; }   // <- nullable; no price = null
     }
 
 
-
-    /* ============ NEW PRODUCT REQUEST (from AddProductModal) ============ */
-    public sealed class CreateProductRequest
-    {
-        public string Name { get; set; } = "";
-        public Guid MenuNodeId { get; set; }
-        public string Type { get; set; } = ""; /* ui will send "Bottle" / "Cocktail" for now */
-        public decimal ? Price { get; set; }
-        public List<CreateProductComponentRequest> Components { get; set; } = new();
-    }
-
+    /* Each ingredient component within a product */
     public sealed class CreateProductComponentRequest
     {
         public Guid IngredientId { get; set; }
-        public decimal AmountMl { get; set; }         /* parse from UI "amount" */
-        public bool IsLeading { get; set; }
-        public bool IsChangeable { get; set; }
+        public decimal AmountMl { get; set; }         /* parsed from UI amount field */
+        public bool IsLeading { get; set; }           /* main ingredient (e.g. gin in gin tonic) */
+        public bool IsChangeable { get; set; }        /* can bartender substitute this? */
     }
 
+    /* ============ CREATE PRODUCT REQUEST ============ */
+    public sealed class CreateSimpleProductRequest
+    {
+        public Guid? MenuNodeId { get; set; }
+        public string? Type { get; set; }
+        public string Name { get; set; } = "";
+        public bool SoldAsBottleOnly { get; set; }
+        public List<Guid>? MenuNodeIds { get; set; }
+        /* may be empty � represents a product without ingredients */
+        public List<CreateProductComponentRequest>? Components { get; set; } = new();
+    }
 
+    public sealed class LinkProductRequest { public Guid ProductId { get; set; } }
 
     /* ============ INGREDIENTS (for dropdowns) ============ */
     public sealed class IngredientDto
     {
+        [JsonPropertyName("Id")]
         public Guid IngredientId { get; set; }
+        [JsonPropertyName("IngredientId")]
         public string Name { get; set; } = "";
     }
 
@@ -122,16 +126,10 @@ namespace RestaurantSys.Api
 
 
     /* ============ PRICES TAB ============ */
-    public sealed class PriceRowDto
+    public sealed class UpsertProductPriceRequest
     {
         public Guid ProductId { get; set; }
-        public string ProductName { get; set; } = "";
+        public int MenuNum { get; set; }
         public decimal? Price { get; set; }
-    }
-
-    public sealed class UpdatePriceRequestRow
-    {
-        public Guid ProductId { get; set; }
-        public decimal Price { get; set; }
     }
 }

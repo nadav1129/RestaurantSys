@@ -69,3 +69,4 @@ C:\Projects\RestaurantSys\src\RestaurantSys.ConsoleRunner\bin\Debug\net8.0\Npgsq
 C:\Projects\RestaurantSys\src\RestaurantSys.ConsoleRunner\bin\Debug\net8.0\RBush.dll
 C:\Projects\RestaurantSys\src\RestaurantSys.ConsoleRunner\bin\Debug\net8.0\SixLabors.Fonts.dll
 C:\Projects\RestaurantSys\src\RestaurantSys.ConsoleRunner\bin\Debug\net8.0\System.IO.Packaging.dll
+C:\Projects\RestaurantSys\backend\src\RestaurantSys.ConsoleRunner\obj\Debug\net8.0\RestaurantSys.ConsoleRunner.sourcelink.json

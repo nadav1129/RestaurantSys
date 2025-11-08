@@ -43,3 +43,4 @@ C:\Projects\RestaurantSys\src\RestaurantSys.Application\obj\Debug\net8.0\Restaur
 C:\Projects\RestaurantSys\src\RestaurantSys.Application\obj\Debug\net8.0\refint\RestaurantSys.Application.dll
 C:\Projects\RestaurantSys\src\RestaurantSys.Application\obj\Debug\net8.0\RestaurantSys.Application.pdb
 C:\Projects\RestaurantSys\src\RestaurantSys.Application\obj\Debug\net8.0\ref\RestaurantSys.Application.dll
+C:\Projects\RestaurantSys\backend\src\RestaurantSys.Application\obj\Debug\net8.0\RestaurantSys.Application.sourcelink.json

@@ -121,3 +121,4 @@ C:\Projects\RestaurantSys\backend\src\ExporterWorker\obj\Debug\net9.0\refint\Exp
 C:\Projects\RestaurantSys\backend\src\ExporterWorker\obj\Debug\net9.0\ExporterWorker.pdb
 C:\Projects\RestaurantSys\backend\src\ExporterWorker\obj\Debug\net9.0\ExporterWorker.genruntimeconfig.cache
 C:\Projects\RestaurantSys\backend\src\ExporterWorker\obj\Debug\net9.0\ref\ExporterWorker.dll
+C:\Projects\RestaurantSys\backend\src\ExporterWorker\obj\Debug\net9.0\ExporterWorker.sourcelink.json

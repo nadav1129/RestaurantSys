@@ -127,3 +127,4 @@ C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\obj\D
 C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\obj\Debug\net9.0\RestaurantSys.ManagementApi.pdb
 C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\obj\Debug\net9.0\RestaurantSys.ManagementApi.genruntimeconfig.cache
 C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\obj\Debug\net9.0\ref\RestaurantSys.ManagementApi.dll
+C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\obj\Debug\net9.0\RestaurantSys.ManagementApi.sourcelink.json

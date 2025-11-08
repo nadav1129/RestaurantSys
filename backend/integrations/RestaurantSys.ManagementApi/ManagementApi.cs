@@ -12,7 +12,8 @@ namespace RestaurantSys.Api
     {
         public static void MapManagementApi(this WebApplication app)
         {
-            // ===== MENUS (PARTITIONS) =====
+            /* ========== MENUS ========== */
+            // Add new menu
             app.MapGet("/api/menus", async (NpgsqlDataSource db) =>
             {
                 try
@@ -120,6 +121,7 @@ namespace RestaurantSys.Api
                 }
             });
 
+            // Edit menu name
             app.MapPatch("/api/menus/{menuNum:int}", async (int menuNum, UpdateMenuPayload payload, NpgsqlDataSource db) =>
             {
                 try
@@ -177,7 +179,7 @@ namespace RestaurantSys.Api
 
 
             /* ========== MENU NODES (TREE) ========== */
-
+            // Get nodes from menu num
             app.MapGet("/api/menu-nodes", async (HttpRequest req, NpgsqlDataSource db) =>
         {
             try
@@ -243,8 +245,7 @@ namespace RestaurantSys.Api
             }
         });
 
-
-
+            // Add new menu node under selected menu
             app.MapPost("/api/menu-nodes", async (HttpRequest req, NpgsqlDataSource db) =>
             {
                 try
@@ -375,6 +376,39 @@ namespace RestaurantSys.Api
                 }
             });
 
+            // Delete menu node - deletes all of the sons as well.
+            app.MapDelete("/api/menu-nodes/{nodeId:guid}", async (Guid nodeId, NpgsqlDataSource db) =>
+            {
+                try
+                {
+                    // Verify exists
+                    const string existsSql = "select 1 from public.menu_nodes where node_id = $1;";
+                    await using (var chk = db.CreateCommand(existsSql))
+                    {
+                        chk.Parameters.AddWithValue(nodeId);
+                        var exists = await chk.ExecuteScalarAsync();
+                        if (exists is null) return Results.NotFound(new { error = "Node not found." });
+                    }
+
+                    // Delete node (children will cascade via parent FK; products via products.menu_node_id FK)
+                    const string delSql = "delete from public.menu_nodes where node_id = $1;";
+                    await using (var cmd = db.CreateCommand(delSql))
+                    {
+                        cmd.Parameters.AddWithValue(nodeId);
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+
+                    return Results.NoContent();
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("Error in DELETE /api/menu-nodes/{id}:\n" + ex);
+                    return Results.Problem($"DELETE /api/menu-nodes failed: {ex.Message}", statusCode: 500);
+                }
+            });
+
+
+
             /* ========== INGREDIENTS ========== */
             app.MapGet("/api/ingredients", async (NpgsqlDataSource db) =>
             {
@@ -397,81 +431,437 @@ namespace RestaurantSys.Api
                     });
                 }
 
+                return Results.Json(
+                list,
+                new System.Text.Json.JsonSerializerOptions
+                {
+                     PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                }
+                );
+            });
+
+            // Create new ingridient
+            app.MapPost("/api/ingredients", async (HttpRequest req, NpgsqlDataSource db) =>
+            {
+                try
+                {
+                    var body = await System.Text.Json.JsonSerializer.DeserializeAsync<JsonElement>(req.Body);
+                    if (body.ValueKind == System.Text.Json.JsonValueKind.Undefined ||
+                        body.ValueKind == System.Text.Json.JsonValueKind.Null)
+                        return Results.BadRequest(new { error = "Invalid JSON." });
+
+                    var name = body.TryGetProperty("name", out var n) ? n.GetString()?.Trim() ?? "" : "";
+                    if (string.IsNullOrWhiteSpace(name))
+                        return Results.BadRequest(new { error = "Name is required." });
+
+                    /* Optional field from UI, ignore if backend doesn’t support it yet */
+                    var baseUnit = body.TryGetProperty("baseUnit", out var b) ? b.GetString() ?? "" : "";
+
+                    // Check for duplicate (case-insensitive)
+                    const string checkSql = "select 1 from public.ingredients where lower(name) = lower($1) limit 1;";
+                    await using (var checkCmd = db.CreateCommand(checkSql))
+                    {
+                        checkCmd.Parameters.AddWithValue(name);
+                        var exists = await checkCmd.ExecuteScalarAsync();
+                        if (exists is not null)
+                            return Results.BadRequest(new { error = "Ingredient already exists." });
+                    }
+
+                    // Insert new ingredient
+                    var id = Guid.NewGuid();
+                    const string insSql = @"
+            insert into public.ingredients (ingredient_id, name)
+            values ($1, $2);
+        ";
+                    await using (var insCmd = db.CreateCommand(insSql))
+                    {
+                        insCmd.Parameters.AddWithValue(id);
+                        insCmd.Parameters.AddWithValue(name);
+                        await insCmd.ExecuteNonQueryAsync();
+                    }
+
+                    return Results.Json(new { ingredientId = id, name, baseUnit });
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("Error in POST /api/ingredients:\n" + ex);
+                    return Results.Problem($"POST /api/ingredients failed: {ex.Message}", statusCode: 500);
+                }
+            });
+
+            // Delete selected Ingridient
+            app.MapDelete("/api/ingredients/{id:guid}", async (Guid id, NpgsqlDataSource db) =>
+            {
+                // 0) Does it exist?
+                const string checkIng = "select name from public.ingredients where ingredient_id = $1;";
+                string? ingName = null;
+                await using (var chk = db.CreateCommand(checkIng))
+                {
+                    chk.Parameters.AddWithValue(id);
+                    var o = await chk.ExecuteScalarAsync();
+                    if (o is null) return Results.NotFound(new { error = "Ingredient not found." });
+                    ingName = (string)o;
+                }
+
+                // 1) Is it referenced by any product?
+                const string usageCountSql = "select count(*) from public.product_ingredients where ingredient_id = $1;";
+                int usageCount;
+                await using (var ccmd = db.CreateCommand(usageCountSql))
+                {
+                    ccmd.Parameters.AddWithValue(id);
+                    usageCount = Convert.ToInt32(await ccmd.ExecuteScalarAsync());
+                }
+
+                if (usageCount > 0)
+                {
+                    // Optional: return up to 5 sample product names to help the user
+                    const string sampleSql = @"
+            select p.name
+            from public.product_ingredients pi
+            join public.products p on p.product_id = pi.product_id
+            where pi.ingredient_id = $1
+            order by lower(p.name)
+            limit 5;";
+                    var samples = new List<string>();
+                    await using (var scmd = db.CreateCommand(sampleSql))
+                    {
+                        scmd.Parameters.AddWithValue(id);
+                        await using var r = await scmd.ExecuteReaderAsync();
+                        while (await r.ReadAsync()) samples.Add(r.GetString(0));
+                    }
+
+                    return Results.Json(new
+                    {
+                        error = "Ingredient is in use and cannot be deleted.",
+                        ingredientId = id,
+                        ingredientName = ingName,
+                        inUseCount = usageCount,
+                        sampleProducts = samples
+                    }, statusCode: StatusCodes.Status409Conflict);
+                }
+
+                // 2) Safe to delete
+                const string delSql = "delete from public.ingredients where ingredient_id = $1;";
+                await using (var del = db.CreateCommand(delSql))
+                {
+                    del.Parameters.AddWithValue(id);
+                    await del.ExecuteNonQueryAsync();
+                }
+
+                return Results.NoContent();
+            });
+
+
+
+            /* ========== PRODUCTS (LIST/FILTER) ========== */
+            /* NEW */
+            /* Gets all created products */
+            app.MapGet("/api/products", async (HttpRequest req, NpgsqlDataSource db) =>
+            {
+                var search = req.Query["search"].ToString()?.Trim();
+                const string sql = @"
+        select p.product_id, p.name, p.type, pr.price
+        from products p
+        left join product_prices pr on pr.product_id = p.product_id
+        where (@q is null or p.name ilike '%'||@q||'%')
+        order by p.name;
+    ";
+                var list = new List<ProductListItemDto>();
+                await using var cmd = db.CreateCommand(sql);
+                cmd.Parameters.Add("@q", NpgsqlTypes.NpgsqlDbType.Text)
+                .Value = string.IsNullOrWhiteSpace(search) ? (object)DBNull.Value : search!;
+                await using var r = await cmd.ExecuteReaderAsync();
+                while (await r.ReadAsync())
+                {
+                    list.Add(new ProductListItemDto
+                    {
+                        Id = r.GetGuid(0),
+                        Name = r.GetString(1),
+                        Type = r.GetString(2),
+                        // Price = r.IsDBNull(3) ? (decimal?)null : r.GetDecimal(3)
+                    });
+                }
                 return Results.Json(list);
             });
 
-            /* ========== PRODUCTS (LIST/FILTER) ========== */
-            app.MapGet("/api/products", async (HttpRequest req, NpgsqlDataSource db) =>
+            app.MapGet("/api/menu-nodes/{nodeId:guid}/products", async (Guid nodeId, NpgsqlDataSource db) =>
             {
-                var menuNodeIdStr = req.Query["menuNodeId"].ToString();
-                var isBottleOnlyStr = req.Query["isBottleOnly"].ToString();
+                const string sql = @"
+        select
+          p.product_id,
+          p.name,
+          p.type,
+          pr.price           -- <- ensure this is the actual column name
+        from product_menu_nodes pmn
+        join products    p  on p.product_id = pmn.product_id
+        join menu_nodes  mn on mn.node_id   = pmn.menu_node_id
+        left join product_prices pr
+               on pr.product_id = p.product_id
+              and pr.menu_num   = mn.menu_num
+        where pmn.menu_node_id = @node
+        order by p.name;
+    ";
 
-                // Case A: products under a specific leaf
-                if (!string.IsNullOrWhiteSpace(menuNodeIdStr)
-                    && Guid.TryParse(menuNodeIdStr, out var menuNodeId))
+                var list = new List<ProductListItemDto>();
+                await using var cmd = db.CreateCommand(sql);
+                cmd.Parameters.AddWithValue("@node", NpgsqlTypes.NpgsqlDbType.Uuid, nodeId);
+
+                await using var r = await cmd.ExecuteReaderAsync();
+                while (await r.ReadAsync())
                 {
-                    const string sql = @"
-                        select p.product_id, p.name, p.type, pr.price
-                        from products p
-                        left join product_prices pr on pr.product_id = p.product_id
-                        where p.menu_node_id = $1
-                        order by p.name;
-                    ";
+                    var priceCents = r.IsDBNull(3) ? (int?)null : r.GetInt32(3);
 
-                    var list = new List<ProductListItemDto>();
-
-                    await using var cmd = db.CreateCommand(sql);
-                    cmd.Parameters.AddWithValue(menuNodeId);
-                    await using var reader = await cmd.ExecuteReaderAsync();
-                    while (await reader.ReadAsync())
+                    list.Add(new ProductListItemDto
                     {
-                        list.Add(new ProductListItemDto
-                        {
-                            Id = reader.GetGuid(0),
-                            Name = reader.GetString(1),
-                            Type = reader.GetString(2),
-                            Price = reader.IsDBNull(3) ? (decimal?)null : reader.GetDecimal(3)
-                        });
-                    }
-
-                    return Results.Json(list);
+                        Id = r.GetGuid(0),
+                        Name = r.GetString(1),
+                        Type = r.GetString(2),
+                        Price = priceCents,     // <- include price
+                    });
                 }
 
-                // Case B: only bottle SKUs (Speed Rail dropdown)
-                if (!string.IsNullOrWhiteSpace(isBottleOnlyStr)
-                    && isBottleOnlyStr.Equals("true", StringComparison.OrdinalIgnoreCase))
-                {
-                    const string sql = @"
-                        select p.product_id, p.name, p.type, pr.price
-                        from products p
-                        left join product_prices pr on pr.product_id = p.product_id
-                        where p.type = 'Bottle'
-                        order by p.name;
-                    ";
-
-                    var list = new List<ProductListItemDto>();
-
-                    await using var cmd = db.CreateCommand(sql);
-                    await using var reader = await cmd.ExecuteReaderAsync();
-                    while (await reader.ReadAsync())
-                    {
-                        list.Add(new ProductListItemDto
-                        {
-                            Id = reader.GetGuid(0),
-                            Name = reader.GetString(1),
-                            Type = reader.GetString(2),
-                            Price = reader.IsDBNull(3) ? (decimal?)null : reader.GetDecimal(3)
-                        });
-                    }
-
-                    return Results.Json(list);
-                }
-
-                // fallback
-                return Results.Json(Array.Empty<ProductListItemDto>());
+                return Results.Json(list);
             });
 
-            /* ========== SPEED MAP GET ========== */
+
+            app.MapPost("/api/menu-nodes/{nodeId:guid}/products", async (Guid nodeId, HttpRequest req, NpgsqlDataSource db) =>
+            {
+                var body = await req.ReadFromJsonAsync<LinkProductRequest>();
+                if (body is null || body.ProductId == Guid.Empty)
+                    return Results.BadRequest(new { error = "ProductId is required." });
+
+                const string sql = @"
+        insert into product_menu_nodes (product_id, menu_node_id)
+        values (@pid, @nid)
+        on conflict do nothing;
+    ";
+                await using var cmd = db.CreateCommand(sql);
+                cmd.Parameters.AddWithValue("@pid", NpgsqlTypes.NpgsqlDbType.Uuid, body.ProductId);
+                cmd.Parameters.AddWithValue("@nid", NpgsqlTypes.NpgsqlDbType.Uuid, nodeId);
+                await cmd.ExecuteNonQueryAsync();
+
+                return Results.NoContent();
+            });
+
+
+            /* NEW */
+            app.MapPost("/api/products", async (HttpRequest req, NpgsqlDataSource db) =>
+            {
+                try
+                {
+                    var body = await req.ReadFromJsonAsync<CreateSimpleProductRequest>();
+                    if (body is null) return Results.BadRequest(new { error = "Invalid JSON." });
+
+                    var name = (body.Name ?? string.Empty).Trim();
+                    if (name.Length == 0) return Results.BadRequest(new { error = "Name is required." });
+
+                    body.Components ??= new List<CreateProductComponentRequest>();
+
+                    // collect node ids from single + multi
+                    var nodeIds = new HashSet<Guid>();
+                    if (body.MenuNodeId is Guid single && single != Guid.Empty) nodeIds.Add(single);
+                    if (body.MenuNodeIds is { Count: > 0 })
+                        foreach (var id in body.MenuNodeIds)
+                            if (id != Guid.Empty) nodeIds.Add(id);
+
+                    await using var conn = await db.OpenConnectionAsync();
+                    await using var tx = await conn.BeginTransactionAsync();
+
+                    // validate menu nodes (exist and are leaf) if any provided
+                    if (nodeIds.Count > 0)
+                    {
+                        const string nodeSql = @"
+                select node_id, is_leaf
+                from public.menu_nodes
+                where node_id = any(@ids::uuid[])
+            ";
+                        await using (var nodeCmd = new NpgsqlCommand(nodeSql, conn, tx))
+                        {
+                            nodeCmd.Parameters.AddWithValue("@ids", nodeIds.ToArray());
+                            var seen = new HashSet<Guid>();
+                            await using var r = await nodeCmd.ExecuteReaderAsync();
+                            var nonLeafFound = false;
+                            while (await r.ReadAsync())
+                            {
+                                var nid = r.GetGuid(0);
+                                var isLeaf = r.GetBoolean(1);
+                                seen.Add(nid);
+                                if (!isLeaf) nonLeafFound = true;
+                            }
+                            await r.DisposeAsync();
+
+                            if (seen.Count != nodeIds.Count)
+                                return Results.BadRequest(new { error = "One or more menu nodes do not exist." });
+                            if (nonLeafFound)
+                                return Results.BadRequest(new { error = "Product must be attached only to leaf nodes." });
+                        }
+                    }
+
+                    // validate ingredients if components provided
+                    var comps = body.Components
+                        .Where(x => x is not null && x.IngredientId != Guid.Empty)
+                        .GroupBy(x => x.IngredientId)
+                        .Select(g => new
+                        {
+                            IngredientId = g.Key,
+                            IsChangeable = g.Last().IsChangeable,
+                            IsLeading = g.Last().IsLeading,
+                            AmountMl = g.Last().AmountMl
+                        })
+                        .ToArray();
+
+                    if (comps.Length > 0)
+                    {
+                        const string ingSql = "select count(*) from public.ingredients where ingredient_id = any(@ids::uuid[])";
+                        await using var ingCmd = new NpgsqlCommand(ingSql, conn, tx);
+                        ingCmd.Parameters.AddWithValue("@ids", comps.Select(c => c.IngredientId).ToArray());
+                        var foundCount = Convert.ToInt32(await ingCmd.ExecuteScalarAsync());
+                        if (foundCount != comps.Length)
+                            return Results.BadRequest(new { error = "One or more ingredientIds do not exist." });
+                    }
+
+                    // insert product (legacy column menu_node_id kept nullable for now)
+                    var newId = Guid.NewGuid();
+                    const string insProd = @"
+            insert into public.products (product_id, menu_node_id, name, type, sold_as_bottle_only)
+            values (@pid, @menu_node_id, @name, @type, @sold)
+        ";
+                    await using (var pCmd = new NpgsqlCommand(insProd, conn, tx))
+                    {
+                        pCmd.Parameters.Add("@pid", NpgsqlTypes.NpgsqlDbType.Uuid).Value = newId;
+
+                        // IMPORTANT: always declare the type for nullable params
+                        var pMenuNode = pCmd.Parameters.Add("@menu_node_id", NpgsqlTypes.NpgsqlDbType.Uuid);
+                        pMenuNode.Value = (nodeIds.Count == 1) ? nodeIds.First() : DBNull.Value;
+
+                        pCmd.Parameters.Add("@name", NpgsqlTypes.NpgsqlDbType.Text).Value = name;
+
+                        // Constant type for all products (change the string if you prefer "Bottle" etc.)
+                        pCmd.Parameters.Add("@type", NpgsqlTypes.NpgsqlDbType.Text).Value = "Cocktail";
+
+                        pCmd.Parameters.Add("@sold", NpgsqlTypes.NpgsqlDbType.Boolean).Value = body.SoldAsBottleOnly;
+
+                        await pCmd.ExecuteNonQueryAsync();
+                    }
+
+                    // insert many-to-many links (one row per node id)
+                    if (nodeIds.Count > 0)
+                    {
+                        const string linkSql = @"
+                insert into public.product_menu_nodes (product_id, menu_node_id)
+                values (@pid, @nid)
+                on conflict do nothing
+            ";
+                        foreach (var nid in nodeIds)
+                        {
+                            await using var linkCmd = new NpgsqlCommand(linkSql, conn, tx);
+                            linkCmd.Parameters.AddWithValue("@pid", NpgsqlTypes.NpgsqlDbType.Uuid, newId);
+                            linkCmd.Parameters.AddWithValue("@nid", NpgsqlTypes.NpgsqlDbType.Uuid, nid);
+                            await linkCmd.ExecuteNonQueryAsync();
+                        }
+                    }
+
+                    // insert components (same as your version; AmountMl kept for future if needed)
+                    if (comps.Length > 0)
+                    {
+                        const string insComp = @"
+                insert into public.product_ingredients (product_id, ingredient_id, changeable, is_leading)
+                values (@pid, @ing, @chg, @lead)
+                on conflict (product_id, ingredient_id) do update
+                set changeable = excluded.changeable,
+                    is_leading = excluded.is_leading
+            ";
+                        foreach (var c in comps)
+                        {
+                            await using var cCmd = new NpgsqlCommand(insComp, conn, tx);
+                            cCmd.Parameters.AddWithValue("@pid", NpgsqlTypes.NpgsqlDbType.Uuid, newId);
+                            cCmd.Parameters.AddWithValue("@ing", NpgsqlTypes.NpgsqlDbType.Uuid, c.IngredientId);
+                            cCmd.Parameters.AddWithValue("@chg", c.IsChangeable);
+                            cCmd.Parameters.AddWithValue("@lead", c.IsLeading);
+                            await cCmd.ExecuteNonQueryAsync();
+                        }
+                    }
+
+                    await tx.CommitAsync();
+
+                    return Results.Json(new
+                    {
+                        productId = newId,
+                        name,
+                        soldAsBottleOnly = body.SoldAsBottleOnly,
+                        attachedNodeIds = nodeIds.ToArray(),
+                        components = comps
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("Error in POST /api/products:\n" + ex);
+                    return Results.Problem($"POST /api/products failed: {ex.Message}", statusCode: 500);
+                }
+            });
+
+
+
+            /* NEW */
+            // Delete selected Prodduct
+
+
+
+            /* ========== PRICES ========== */
+            app.MapPost("/api/product-prices", async (HttpRequest req, NpgsqlDataSource db) =>
+            {
+                try
+                {
+                    var opts = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var body = await req.ReadFromJsonAsync<UpsertProductPriceRequest>(opts);
+                    Console.WriteLine($"[POST /api/product-prices] pid={body?.ProductId} menu={body?.MenuNum} price={body?.Price}");
+
+                    if (body is null) return Results.BadRequest(new { error = "Invalid JSON." });
+                    if (body.ProductId == Guid.Empty) return Results.BadRequest(new { error = "ProductId is required." });
+                    if (body.MenuNum <= 0) return Results.BadRequest(new { error = "menuNum must be positive." });
+
+                    const string sql = @"
+        insert into public.product_prices (product_id, menu_num, price)
+        values (@pid, @menu, @price)
+        on conflict on constraint product_prices_pkey
+        do update set price = excluded.price;
+    ";
+                    await using var cmd = db.CreateCommand(sql);
+                    cmd.Parameters.AddWithValue("@pid", NpgsqlTypes.NpgsqlDbType.Uuid, body.ProductId);
+                    cmd.Parameters.AddWithValue("@menu", NpgsqlTypes.NpgsqlDbType.Integer, body.MenuNum);
+                    cmd.Parameters.AddWithValue("@price", NpgsqlTypes.NpgsqlDbType.Numeric, (object?)body.Price ?? DBNull.Value);
+                    await cmd.ExecuteNonQueryAsync();
+                    return Results.NoContent();
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("Error in POST /api/products-prices:\n" + ex);
+                    return Results.Problem($"POST /api/products-prices failed: {ex.Message}", statusCode: 500);
+                }
+            });
+
+            app.MapDelete("/api/menu-nodes/{nodeId:guid}/products/{productId:guid}", async (Guid nodeId, Guid productId, NpgsqlDataSource db) =>
+            {
+                try
+                {
+                    const string sql = @"delete from product_menu_nodes where menu_node_id = @nid and product_id = @pid;";
+                    await using var cmd = db.CreateCommand(sql);
+                    cmd.Parameters.AddWithValue("@nid", NpgsqlTypes.NpgsqlDbType.Uuid, nodeId);
+                    cmd.Parameters.AddWithValue("@pid", NpgsqlTypes.NpgsqlDbType.Uuid, productId);
+                    var rows = await cmd.ExecuteNonQueryAsync();
+                    return rows > 0 ? Results.NoContent() : Results.NotFound();
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("Error in Delete /api/menu-nodes/{nodeId:guid}/products/{productId:guid}:\n" + ex);
+                    return Results.Problem($"DELETE /api/menu-nodes/{{nodeId:guid}}/products/{{productId:guid}} failed: {ex.Message}", statusCode: 500);
+                }
+            });
+
+
+
+            /* ========== SPEED MAP ========== */
+            /* NEW */
             app.MapGet("/api/speed-map", async (NpgsqlDataSource db) =>
             {
                 const string sql = @"
@@ -503,7 +893,7 @@ namespace RestaurantSys.Api
                 return Results.Json(list);
             });
 
-            /* ========== SPEED MAP PUT ========== */
+            /* NEW */
             app.MapPut("/api/speed-map", async (HttpRequest req, NpgsqlDataSource db) =>
             {
                 var body = await JsonSerializer.DeserializeAsync<List<UpdateSpeedMapRequestRow>>(req.Body);
@@ -537,58 +927,7 @@ namespace RestaurantSys.Api
                 return Results.Ok();
             });
 
-            /* ========== PRICES GET ========== */
-            app.MapGet("/api/prices", async (NpgsqlDataSource db) =>
-            {
-                const string sql = @"
-                    select p.product_id,
-                           p.name,
-                           pr.price
-                    from products p
-                    left join product_prices pr on pr.product_id = p.product_id
-                    order by p.name;
-                ";
-
-                var list = new List<PriceRowDto>();
-
-                await using var cmd = db.CreateCommand(sql);
-                await using var reader = await cmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
-                {
-                    list.Add(new PriceRowDto
-                    {
-                        ProductId = reader.GetGuid(0),
-                        ProductName = reader.GetString(1),
-                        Price = reader.IsDBNull(2) ? (decimal?)null : reader.GetDecimal(2)
-                    });
-                }
-
-                return Results.Json(list);
-            });
-
-            /* ========== PRICES PUT ========== */
-            app.MapPut("/api/prices", async (HttpRequest req, NpgsqlDataSource db) =>
-            {
-                var body = await JsonSerializer.DeserializeAsync<List<UpdatePriceRequestRow>>(req.Body);
-                if (body is null)
-                    return Results.BadRequest("invalid json");
-
-                foreach (var row in body)
-                {
-                    const string upSql = @"
-                        insert into product_prices (product_id, price)
-                        values ($1,$2)
-                        on conflict (product_id)
-                        do update set price = excluded.price;
-                    ";
-                    await using var upCmd = db.CreateCommand(upSql);
-                    upCmd.Parameters.AddWithValue(row.ProductId);
-                    upCmd.Parameters.AddWithValue(row.Price);
-                    await upCmd.ExecuteNonQueryAsync();
-                }
-
-                return Results.Ok();
-            });
+        
         }
     }
 }

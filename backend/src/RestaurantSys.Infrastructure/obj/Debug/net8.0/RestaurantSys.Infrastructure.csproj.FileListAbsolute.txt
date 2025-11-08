@@ -49,3 +49,4 @@ C:\Projects\RestaurantSys\src\RestaurantSys.Infrastructure\obj\Debug\net8.0\Rest
 C:\Projects\RestaurantSys\src\RestaurantSys.Infrastructure\obj\Debug\net8.0\refint\RestaurantSys.Infrastructure.dll
 C:\Projects\RestaurantSys\src\RestaurantSys.Infrastructure\obj\Debug\net8.0\RestaurantSys.Infrastructure.pdb
 C:\Projects\RestaurantSys\src\RestaurantSys.Infrastructure\obj\Debug\net8.0\ref\RestaurantSys.Infrastructure.dll
+C:\Projects\RestaurantSys\backend\src\RestaurantSys.Infrastructure\obj\Debug\net8.0\RestaurantSys.Infrastructure.sourcelink.json

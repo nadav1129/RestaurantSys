@@ -62,3 +62,4 @@ C:\Projects\RestaurantSys\backend\integrations\WhatsAppShiftBot\obj\Debug\net9.0
 C:\Projects\RestaurantSys\backend\integrations\WhatsAppShiftBot\obj\Debug\net9.0\WhatsAppWebhook.dll
 C:\Projects\RestaurantSys\backend\integrations\WhatsAppShiftBot\obj\Debug\net9.0\refint\WhatsAppWebhook.dll
 C:\Projects\RestaurantSys\backend\integrations\WhatsAppShiftBot\obj\Debug\net9.0\WhatsAppWebhook.pdb
+C:\Projects\RestaurantSys\backend\integrations\WhatsAppShiftBot\obj\Debug\net9.0\WhatsAppWebhook.sourcelink.json

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import MenuPage from "./MenuPage";
+import MenuPage from "./MenuPage/MenuPage";
 import SpeedPage from "./SpeedPage";
 
 export default function ManagementPage() {

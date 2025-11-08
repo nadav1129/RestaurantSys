@@ -33,3 +33,4 @@ C:\Projects\RestaurantSys\src\RestaurantSys.Domain\obj\Debug\net8.0\RestaurantSy
 C:\Projects\RestaurantSys\src\RestaurantSys.Domain\obj\Debug\net8.0\ref\RestaurantSys.Domain.dll
 C:\Projects\RestaurantSys\src\RestaurantSys.Domain\obj\Debug\net8.0\RestaurantSys.Domain.csproj.AssemblyReference.cache
 C:\Projects\RestaurantSys\backend\src\RestaurantSys.Domain\obj\Debug\net8.0\RestaurantSys.Domain.csproj.AssemblyReference.cache
+C:\Projects\RestaurantSys\backend\src\RestaurantSys.Domain\obj\Debug\net8.0\RestaurantSys.Domain.sourcelink.json

@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { MenuNode } from "./MenuTree";
 
-
-type MenuSummary = { id: string; name: string };
-
 type ProductIngredientLineDraft = {
   ingredientId: string;
   isLeading: boolean;
@@ -12,31 +9,18 @@ type ProductIngredientLineDraft = {
 };
 
 export default function AddProductModal({
-  defaultNodeId,
-  defaultMenuId,
   onClose,
   onSave,
 }: {
-  defaultNodeId: string;
-  defaultMenuId?: string;
   onClose: () => void;
   onSave: (data: {
     name: string;
-    price: number;
-    menuId?: string | null;
-    menuNodeId: string;
     isBottleOnly: boolean;
     lines: ProductIngredientLineDraft[];
   }) => void;
 }) {
   const [name, setName] = useState("");
-  const [price, setPrice] = useState<number>(0);
-  const [menuId, setMenuId] = useState<string | undefined>(defaultMenuId);
-  const [menuNodeId, setMenuNodeId] = useState(defaultNodeId);
   const [isBottleOnly, setIsBottleOnly] = useState(false);
-
-  const [menus, setMenus] = useState<MenuSummary[]>([]);
-  const [leafNodes, setLeafNodes] = useState<MenuNode[]>([]);
   const [ingredients, setIngredients] = useState<
     { ingredientId: string; name: string }[]
   >([]);
@@ -44,55 +28,6 @@ export default function AddProductModal({
   const [lines, setLines] = useState<ProductIngredientLineDraft[]>([
     { ingredientId: "", isLeading: false, isChangeable: false, amount: "" },
   ]);
-
-  /* load menus */
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch("/api/menus");
-        const data = await res.json();
-        const normalized: MenuSummary[] = (Array.isArray(data) ? data : []).map(
-          (m: any) => ({
-            id: String(m.id ?? m.menuId ?? m.MenuId ?? ""),
-            name: String(m.name ?? m.MenuName ?? "Menu"),
-          })
-        );
-        setMenus(normalized);
-        if (!menuId && normalized.length > 0) {
-          setMenuId(normalized[0].id);
-        }
-      } catch {
-        setMenus([]);
-      }
-    })();
-  }, []); // once
-
-  /* load leaf nodes for the chosen menu */
-  useEffect(() => {
-    (async () => {
-      try {
-        const url = menuId
-          ? `/api/menu-nodes?menuId=${menuId}`
-          : "/api/menu-nodes";
-        const res = await fetch(url);
-        const data: MenuNode[] = await res.json();
-
-        const flat: MenuNode[] = [];
-        function walk(n: MenuNode) {
-          if (n.isLeaf) flat.push(n);
-          if (n.children) n.children.forEach(walk);
-        }
-        (Array.isArray(data) ? data : []).forEach(walk);
-
-        setLeafNodes(flat);
-        if (!flat.find((n) => n.id === menuNodeId)) {
-          setMenuNodeId(flat[0]?.id ?? "");
-        }
-      } catch {
-        setLeafNodes([]);
-      }
-    })();
-  }, [menuId]); // refresh when menu changes
 
   /* ingredients */
   useEffect(() => {
@@ -131,9 +66,6 @@ export default function AddProductModal({
     e.stopPropagation();
     onSave({
       name,
-      price,
-      menuId: menuId ?? null,
-      menuNodeId,
       isBottleOnly,
       lines,
     });
@@ -154,11 +86,7 @@ export default function AddProductModal({
             </div>
           </div>
           <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onClose();
-            }}
+            onClick={onClose}
             className="rounded-xl border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
           >
             Close
@@ -177,56 +105,6 @@ export default function AddProductModal({
                 onChange={(e) => setName(e.target.value)}
                 required
               />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-700">
-                Price (₪)
-              </label>
-              <input
-                type="number"
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                value={price}
-                onChange={(e) => setPrice(parseFloat(e.target.value))}
-                min={0}
-                step="0.5"
-                required
-              />
-            </div>
-
-            {/* NEW: choose Menu */}
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-700">
-                Menu
-              </label>
-              <select
-                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                value={menuId ?? ""}
-                onChange={(e) => setMenuId(e.target.value || undefined)}
-              >
-                {menus.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-700">
-                Show this product under
-              </label>
-              <select
-                className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
-                value={menuNodeId}
-                onChange={(e) => setMenuNodeId(e.target.value)}
-              >
-                {leafNodes.map((n) => (
-                  <option key={n.id} value={n.id}>
-                    {n.name}
-                  </option>
-                ))}
-              </select>
             </div>
 
             <div className="col-span-2 flex items-center gap-2">
@@ -341,11 +219,7 @@ export default function AddProductModal({
           <div className="mt-6 flex justify-end gap-2 border-t border-gray-200 pt-4">
             <button
               type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onClose();
-              }}
+              onClick={onClose}
               className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
             >
               Cancel
