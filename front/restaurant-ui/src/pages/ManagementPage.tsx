@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import MenuPage from "./MenuPage/MenuPage";
 import SpeedPage from "./SpeedPage";
+import ManagementSettingsPage from "./ManagementSettingsPage";
 
 export default function ManagementPage() {
   /* which sub-view is active? "menu" | "speed" */
-  const [activeTab, setActiveTab] = useState<"menu" | "speed">("menu");
+  const [activeTab, setActiveTab] = useState<"menu" | "speed" | "settings">("menu");
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
@@ -45,23 +46,42 @@ export default function ManagementPage() {
           >
             Speed Rail
           </button>
+
+           <button
+    onClick={() => setActiveTab("settings")}
+    className={[
+      "rounded-xl border px-3 py-2 text-sm font-medium",
+      activeTab === "settings"
+        ? "border-gray-900 bg-gray-900 text-white"
+        : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
+    ].join(" ")}
+  >
+    Settings
+  </button>
         </div>
       </div>
 
       {/* Body */}
       <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-        {activeTab === "menu" ? (
-          <div className="rounded-xl border border-gray-200 bg-gray-100">
-            {/* We mount MenuPage inside here */}
-            <MenuPage />
-          </div>
-        ) : (
-          <div className="rounded-xl border border-gray-200 bg-white">
-            {/* We mount SpeedPage inside here */}
-            <SpeedPage />
-          </div>
-        )}
-      </div>
+  {activeTab === "menu" && (
+    <div className="rounded-xl border border-gray-200 bg-gray-100">
+      <MenuPage />
+    </div>
+  )}
+
+  {activeTab === "speed" && (
+    <div className="rounded-xl border border-gray-200 bg-white">
+      <SpeedPage />
+    </div>
+  )}
+
+  {activeTab === "settings" && (
+    <div className="rounded-xl border border-gray-200 bg-white">
+      <ManagementSettingsPage />
+    </div>
+  )}
+</div>
+
     </div>
   );
 }

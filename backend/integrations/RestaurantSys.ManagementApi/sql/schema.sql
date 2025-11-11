@@ -81,6 +81,23 @@ CREATE INDEX IF NOT EXISTS ix_products_node ON products(menu_node_id);          
 CREATE INDEX IF NOT EXISTS ix_products_name ON products((lower(name)));         /* Products ix by name */ 
 CREATE INDEX IF NOT EXISTS ix_ingredients_name ON ingredients((lower(name)));   /* Ingredients */
 
+/* MANAGEMENT SETTINGS (singleton) */
+create table if not exists public.management_settings (
+  id                     smallint primary key default 1 check (id = 1),
+  active_menu_num        integer references public.menus(menu_num) on delete set null,
+  global_discount_pct    numeric(5,2) not null default 0
+    check (global_discount_pct >= 0 and global_discount_pct <= 100),
+  updated_at             timestamptz not null default now()
+);
+
+/* Seed the single row */
+insert into public.management_settings (id)
+values (1)
+on conflict (id) do nothing;
+
+/* (Optional) Speed up FK lookups */
+create index if not exists ix_management_settings_active_menu
+  on public.management_settings(active_menu_num);
 
 -- ===== Triggers & functions =====
 

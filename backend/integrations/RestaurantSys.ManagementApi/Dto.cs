@@ -132,4 +132,20 @@ namespace RestaurantSys.Api
         public int MenuNum { get; set; }
         public decimal? Price { get; set; }
     }
+
+
+    /* ============ SETTINGS TAB ============ */
+    public sealed class ManagementSettingsDto
+    {
+        public int? ActiveMenuNum { get; set; }
+        public decimal GlobalDiscountPct { get; set; }
+    }
+
+    public sealed class UpdateManagementSettingsRequest
+    {
+        public int? ActiveMenuNum { get; set; }          /* null clears selection */
+        public decimal? GlobalDiscountPct { get; set; }   /* optional partial update */
+    }
+
+
 }
