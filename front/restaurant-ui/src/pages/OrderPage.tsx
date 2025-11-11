@@ -1,137 +1,245 @@
-// File: src/pages/OrderPage.tsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../components/Button";
+import { apiFetch } from "../api/api";
 
 /* =========================
    Types
 ========================= */
-type Product = {
+
+// UI product model (used at leaf nodes)
+type ProductItem = {
   id: string;
   name: string;
-  price: number;
-  additions?: string[]; // optional add-ons (e.g., “XL”, “Lemon”, “Double”)
+  type: string;
+  price: number | null; // shekels (mapped from backend cents) or null
 };
 
+// UI menu node
 type MenuNode = {
   id: string;
   name: string;
-  children?: MenuNode[]; // non-leaf
-  products?: Product[];  // leaf (if present, treat as leaf)
+  isLeaf?: boolean;      // may be unreliable from backend; we also infer via children
+  children?: MenuNode[];
+  products?: ProductItem[]; // populated when we enter a leaf and fetch products
 };
 
 type CartItem = {
   id: string; // product id
   name: string;
   qty: number;
-  price: number;
+  price: number; /* unit price actually charged */
   additions: string[];
   notes?: string;
 };
 
-/* =========================
-   Mock data (replace via API later)
-========================= */
-const menuTree: MenuNode = {
-  id: "root",
-  name: "Menu",
-  children: [
-    {
-      id: "wine",
-      name: "Wine",
-      children: [
-        {
-          id: "white",
-          name: "White",
-          products: [
-            { id: "p_w_chard", name: "Chardonnay (Glass)", price: 36, additions: ["XL", "Lemon"] },
-            { id: "p_w_sauv", name: "Sauvignon Blanc (Glass)", price: 34, additions: ["XL", "Lemon"] },
-            { id: "p_w_bottle", name: "House White (Bottle)", price: 140, additions: ["Chiller", "2 Ice Buckets"] },
-          ],
-        },
-        {
-          id: "red",
-          name: "Red",
-          products: [
-            { id: "p_r_merlot", name: "Merlot (Glass)", price: 36, additions: ["XL"] },
-            { id: "p_r_cab", name: "Cabernet (Glass)", price: 38, additions: ["XL"] },
-            { id: "p_r_bottle", name: "House Red (Bottle)", price: 150, additions: ["Chiller", "2 Ice Buckets"] },
-          ],
-        },
-      ],
-    },
-    {
-      id: "soft",
-      name: "Soft Drinks",
-      products: [
-        { id: "p_cola", name: "Cola", price: 12, additions: ["Ice", "Lemon"] },
-        { id: "p_soda", name: "Soda", price: 10, additions: ["Ice"] },
-        { id: "p_orange", name: "Orange Juice", price: 16, additions: ["Ice"] },
-      ],
-    },
-    {
-      id: "shots",
-      name: "Shots",
-      children: [
-        {
-          id: "vodka",
-          name: "Vodka",
-          products: [
-            { id: "p_v_plain", name: "Vodka Shot", price: 18, additions: ["XL", "Lemon", "Ice"] },
-            { id: "p_v_premium", name: "Premium Vodka Shot", price: 24, additions: ["XL", "Lemon", "Ice"] },
-          ],
-        },
-        {
-          id: "tequila",
-          name: "Tequila",
-          products: [
-            { id: "p_t_plain", name: "Tequila Shot", price: 20, additions: ["Salt", "Lemon"] },
-            { id: "p_t_premium", name: "Premium Tequila Shot", price: 28, additions: ["Salt", "Lemon"] },
-          ],
-        },
-      ],
-    },
-  ],
+// Backend DTOs
+type SettingsDto = { activeMenuNum: number | null; globalDiscountPct: number };
+
+// This matches your /api/menu-nodes response (children of root)
+type ApiNode = {
+  id: string;
+  parentId: string | null;
+  name: string;
+  isLeaf: boolean;       // may not be trustworthy; we still infer from children
+  children?: ApiNode[];
 };
 
 /* =========================
    Helpers
 ========================= */
+
+// IMPORTANT: only treat explicit true as leaf.
+// If backend sends isLeaf: false for real leaves, we still infer by children.
 function isLeaf(node: MenuNode): boolean {
-  return !!node.products && (!node.children || node.children.length === 0);
+  if (node.isLeaf === true) return true;                           // explicit true
+  if (node.products && node.products.length > 0) return true;      // we already have products
+  return !node.children || node.children.length === 0;             // no children -> leaf
 }
 
-function getChildren(node: MenuNode): MenuNode[] {
-  return node.children ?? [];
+// Map ApiNode -> MenuNode (categories only in this endpoint)
+function mapCategory(n: ApiNode): MenuNode {
+  return {
+    id: n.id,
+    name: n.name,
+    isLeaf: n.isLeaf,
+    children: n.children?.map(mapCategory),
+  };
+}
+
+function arrayEq(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort();
+  const sb = [...b].sort();
+  return sa.every((x, i) => x === sb[i]);
 }
 
 /* =========================
    Page
 ========================= */
 export default function OrderPage() {
-  // “Quick order” table default is none (as requested)
+  // “Quick order” table default is none
   const [table, setTable] = useState<string>("none");
 
   // Order/cart
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  // Menu navigation stack: path from root → current
-  // Start at root but render its children initially
-  const [path, setPath] = useState<MenuNode[]>([menuTree]);
+  // menu + settings
+  const [discountPct, setDiscountPct] = useState<number>(0);
+  const [root, setRoot] = useState<MenuNode | null>(null);
+  const [path, setPath] = useState<MenuNode[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // View mode: browsing products vs customizing a product
   const [mode, setMode] = useState<"browse" | "customize">("browse");
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
 
   // Customization state
   const [customQty, setCustomQty] = useState<number>(1);
   const [customNotes, setCustomNotes] = useState<string>("");
   const [customAdds, setCustomAdds] = useState<string[]>([]);
 
-  const current = path[path.length - 1];
+  // Keep track of which nodeIds we've already fetched products for
+  const fetchedNodeIds = useRef<Set<string>>(new Set());
+
+  // Cache of nodeId -> products so re-entering a category restores its products instantly
+  const productCacheRef = useRef<Map<string, ProductItem[]>>(new Map());
+
+
+  // load active settings + selected menu tree (correct endpoint)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // 1) read current settings (active menu + discount)
+        const s = (await apiFetch("/api/settings")) as SettingsDto;
+        const active = s?.activeMenuNum ?? null;
+        const disc = typeof s?.globalDiscountPct === "number" ? s.globalDiscountPct : 0;
+
+        if (active == null) {
+          if (!cancelled) {
+            setDiscountPct(disc);
+            setRoot(null);
+            setPath([]);
+            setError("No active menu selected. Set it in Management Settings.");
+          }
+          return;
+        }
+
+        // 2) load the tree: backend returns children[] of root
+        const arr = (await apiFetch(`/api/menu-nodes?menu=${active}`)) as ApiNode[];
+
+        // Wrap server's children[] into a fake root
+        const fakeRoot: MenuNode = {
+          id: "root",
+          name: "Menu",
+          isLeaf: false,
+          children: (arr ?? []).map(mapCategory),
+        };
+
+        if (!cancelled) {
+          setDiscountPct(disc);
+          setRoot(fakeRoot);
+          setPath([fakeRoot]);
+        }
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || "Failed to load menu.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const current = path[path.length - 1] ?? null;
   const parent = path.length > 1 ? path[path.length - 2] : null;
 
-  // If at leaf: show its products, else show child categories in sidebar
-  const currentProducts = useMemo(() => (isLeaf(current) ? current.products ?? [] : []), [current]);
+  useEffect(() => {
+  if (!current) return;
+
+  // Only consider nodes that look like leaves (no children or explicitly leaf)
+  if (!isLeaf(current)) return;
+
+  // If node already has products on it, we’re done
+  if (Array.isArray(current.products)) return;
+
+  // If we’ve fetched before, hydrate from cache and stop
+  const cached = productCacheRef.current.get(current.id);
+  if (cached) {
+    setPath((prev) => {
+      if (prev.length === 0) return prev;
+      const next = prev.slice();
+      const i = next.length - 1;
+      next[i] = { ...next[i], products: cached, isLeaf: true };
+      return next;
+    });
+    return;
+  }
+
+  (async () => {
+    try {
+      const arr = (await apiFetch(
+        `/api/menu-nodes/${current.id}/products`
+      )) as Array<{ id: string; name: string; type: string; price: number | null }>;
+
+      // Map backend cents -> UI shekels (remove /100 if already in shekels)
+      const mapped: ProductItem[] = (arr ?? []).map((x) => ({
+        id: x.id,
+        name: x.name,
+        type: x.type,
+        price: (x.price ?? 0) / 100,
+      }));
+
+      // Cache it
+      productCacheRef.current.set(current.id, mapped);
+
+      // 1) Update the node in the current path
+      setPath((prev) => {
+        if (prev.length === 0) return prev;
+        const next = prev.slice();
+        const i = next.length - 1;
+        next[i] = { ...next[i], products: mapped, isLeaf: true };
+        return next;
+      });
+
+      // 2) Also update the node inside the tree (so parent.children holds hydrated child)
+      setRoot((prev) => {
+        if (!prev) return prev;
+
+        const apply = (n: MenuNode): MenuNode => {
+          if (n.id === current.id) {
+            return { ...n, products: mapped, isLeaf: true };
+          }
+          if (!n.children || n.children.length === 0) return n;
+          let changed = false;
+          const children = n.children.map((c) => {
+            const cc = apply(c);
+            if (cc !== c) changed = true;
+            return cc;
+          });
+          return changed ? { ...n, children } : n;
+        };
+
+        return apply(prev);
+      });
+    } catch {
+      // Optionally set an error banner
+      // setError("Failed to load products for this category.");
+    }
+  })();
+}, [current?.id]);
+
+
+  // If at leaf: show its products (or whenever we have products)
+  const currentProducts = useMemo(() => {
+    if (!current) return [];
+    if (Array.isArray(current.products)) return current.products;
+    return isLeaf(current) ? [] : [];
+  }, [current]);
 
   // Totals
   const subtotal = cart.reduce((s, c) => s + c.qty * c.price, 0);
@@ -139,39 +247,29 @@ export default function OrderPage() {
   const total = subtotal + service;
 
   /* -------- Category navigation -------- */
-  const enterNode = (node: MenuNode) => {
-    setPath((p) => [...p, node]);
-    // If leaf, switch main area to products (mode stays browse)
-  };
-
+  const enterNode = (node: MenuNode) => setPath((p) => [...p, node]);
   const goUpOne = () => {
-    if (path.length > 1) {
-      setPath((p) => p.slice(0, p.length - 1));
-    }
+    if (path.length > 1) setPath((p) => p.slice(0, p.length - 1));
   };
 
   /* -------- Product selection / customization -------- */
-  const openCustomize = (p: Product) => {
+  const openCustomize = (p: ProductItem) => {
     setSelectedProduct(p);
     setCustomQty(1);
     setCustomNotes("");
     setCustomAdds([]);
     setMode("customize");
   };
-
-  const toggleAddition = (add: string) => {
-    setCustomAdds((prev) =>
-      prev.includes(add) ? prev.filter((a) => a !== add) : [...prev, add]
-    );
-  };
+  const toggleAddition = (add: string) =>
+    setCustomAdds((prev) => (prev.includes(add) ? prev.filter((a) => a !== add) : [...prev, add]));
 
   const confirmAddToOrder = () => {
     if (!selectedProduct) return;
-    const { id, name, price } = selectedProduct;
+    const { id, name } = selectedProduct;
+    const unitPrice = selectedProduct.price ?? 0; // guard null
     const additions = customAdds.slice();
 
     setCart((prev) => {
-      // Merge line if same product *and* same additions and notes (simple strategy)
       const i = prev.findIndex(
         (c) => c.id === id && c.notes === customNotes && arrayEq(c.additions, additions)
       );
@@ -180,17 +278,17 @@ export default function OrderPage() {
         next[i] = { ...next[i], qty: next[i].qty + customQty };
         return next;
       }
-      return [...prev, { id, name, qty: customQty, price, additions, notes: customNotes }];
+      return [
+        ...prev,
+        { id, name, qty: customQty, price: unitPrice, additions, notes: customNotes },
+      ];
     });
 
-    // Back to browsing
     setMode("browse");
     setSelectedProduct(null);
   };
 
-  const removeCartItem = (index: number) => {
-    setCart((prev) => prev.filter((_, i) => i !== index));
-  };
+  const removeCartItem = (index: number) => setCart((prev) => prev.filter((_, i) => i !== index));
 
   /* =========================
      Render
@@ -251,18 +349,12 @@ export default function OrderPage() {
                       </div>
                       {(c.additions.length > 0 || c.notes) && (
                         <div className="mt-1 text-xs text-gray-600">
-                          {c.additions.length > 0 && (
-                            <div>+ {c.additions.join(", ")}</div>
-                          )}
+                          {c.additions.length > 0 && <div>+ {c.additions.join(", ")}</div>}
                           {c.notes && <div>“{c.notes}”</div>}
                         </div>
                       )}
                     </div>
-                    <Button
-                      variant="secondary"
-                      onClick={() => removeCartItem(idx)}
-                      className="text-xs"
-                    >
+                    <Button variant="secondary" onClick={() => removeCartItem(idx)} className="text-xs">
                       Remove
                     </Button>
                   </div>
@@ -274,68 +366,70 @@ export default function OrderPage() {
 
         {/* Center: main content area */}
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          {mode === "browse" && (
+          {loading && <div className="text-sm text-gray-500">Loading menu…</div>}
+          {!loading && error && <div className="text-sm text-red-600">{error}</div>}
+          {!loading && !error && root && (
             <>
-              {isLeaf(current) ? (
+              {mode === "browse" && (
                 <>
-                  <div className="mb-3 text-sm font-semibold">
-                    {current.name} — Products
-                  </div>
-                  <ProductGrid products={currentProducts} onPick={openCustomize} />
+                  {current ? (
+                    <>
+                      <div className="mb-3 text-sm font-semibold">
+                        {current.name} — Products
+                        {discountPct > 0 && (
+                          <span className="ml-2 text-xs font-normal text-green-700">
+                            ({discountPct}% off applied)
+                          </span>
+                        )}
+                      </div>
+                      <ProductGrid products={currentProducts} onPick={openCustomize} />
+                    </>
+                  ) : (
+                    <div className="text-sm text-gray-500">Pick a category on the right.</div>
+                  )}
                 </>
-              ) : (
-                <div className="text-sm text-gray-500">
-                  Pick a category on the right. (Nothing selected yet.)
-                </div>
+              )}
+
+              {mode === "customize" && selectedProduct && (
+                <CustomizeProduct
+                  product={selectedProduct}
+                  qty={customQty}
+                  setQty={setCustomQty}
+                  notes={customNotes}
+                  setNotes={setCustomNotes}
+                  adds={customAdds}
+                  toggleAdd={(a) =>
+                    setCustomAdds((prev) =>
+                      prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]
+                    )
+                  }
+                  onCancel={() => {
+                    setMode("browse");
+                    setSelectedProduct(null);
+                  }}
+                  onConfirm={confirmAddToOrder}
+                />
               )}
             </>
-          )}
-
-          {mode === "customize" && selectedProduct && (
-            <CustomizeProduct
-              product={selectedProduct}
-              qty={customQty}
-              setQty={setCustomQty}
-              notes={customNotes}
-              setNotes={setCustomNotes}
-              adds={customAdds}
-              toggleAdd={toggleAddition}
-              onCancel={() => {
-                setMode("browse");
-                setSelectedProduct(null);
-              }}
-              onConfirm={confirmAddToOrder}
-            />
           )}
         </div>
 
         {/* Right: Category sidebar with recursive nav */}
         <div className="rounded-2xl border border-gray-200 bg-white p-0 overflow-hidden">
-          {/* Parent header (colored) when not at root */}
-          {parent ? (
-            <button
-              onClick={goUpOne}
-              className="flex w-full items-center justify-between bg-indigo-600 px-4 py-3 text-left text-sm font-medium text-white hover:bg-indigo-700"
-              title="Go up"
-              aria-label="Go up to parent"
-            >
-              <span>{parent.name}</span>
-              {/* up chevron */}
-              <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden>
-                <path d="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" />
-              </svg>
-            </button>
-          ) : (
-            <div className="bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700">
-              {current.name}
-            </div>
-          )}
+          <div className="bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700">
+            {current?.name ?? "Menu"}
+          </div>
 
-          {/* Body: if non-leaf, show children; if leaf, show message */}
           <div className="p-2">
-            {!isLeaf(current) ? (
+            {loading ? (
+              <div className="text-xs text-gray-500">Loading…</div>
+            ) : !root ? (
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
+                No menu loaded.
+              </div>
+            ) : current && (current.children?.length ?? 0) > 0 ? (
               <ul className="space-y-2">
-                {getChildren(current).map((child) => (
+                {(current.children ?? []).map((child) => (
                   <li key={child.id}>
                     <button
                       onClick={() => enterNode(child)}
@@ -348,10 +442,21 @@ export default function OrderPage() {
               </ul>
             ) : (
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
-                This is a leaf. Products are shown in the main area.
+                This is a leaf. Products appear in the main area.
               </div>
             )}
           </div>
+
+          {parent && (
+            <button
+              onClick={() => goUpOne()}
+              className="m-2 w-[calc(100%-1rem)] rounded-xl bg-indigo-600 px-4 py-2 text-left text-sm font-medium text-white hover:bg-indigo-700"
+              title="Go up"
+              aria-label="Go up to parent"
+            >
+              ↑ {parent.name}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -359,34 +464,29 @@ export default function OrderPage() {
 }
 
 /* =========================
-   Subcomponents
+   Local helpers: ProductGrid & CustomizeProduct
 ========================= */
 
 function ProductGrid({
   products,
   onPick,
 }: {
-  products: Product[];
-  onPick: (p: Product) => void;
+  products: ProductItem[];
+  onPick: (p: ProductItem) => void;
 }) {
-  if (products.length === 0) {
-    return <div className="text-sm text-gray-400">No products.</div>;
+  if (!products || products.length === 0) {
+    return <div className="text-sm text-gray-500">No products in this category.</div>;
   }
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
       {products.map((p) => (
         <button
           key={p.id}
           onClick={() => onPick(p)}
-          className="rounded-2xl border border-gray-200 bg-white p-3 text-left hover:border-gray-300 hover:bg-gray-50"
+          className="rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-gray-300 hover:bg-gray-50"
         >
-          <div className="text-sm font-medium">{p.name}</div>
-          <div className="text-xs text-gray-500">₪{p.price}</div>
-          {p.additions && p.additions.length > 0 && (
-            <div className="mt-1 text-[11px] text-gray-400">
-              Additions: {p.additions.join(", ")}
-            </div>
-          )}
+          <div className="text-sm font-medium text-gray-800">{p.name}</div>
+          <div className="text-xs text-gray-500">₪{p.price ?? 0}</div>
         </button>
       ))}
     </div>
@@ -404,7 +504,7 @@ function CustomizeProduct({
   onCancel,
   onConfirm,
 }: {
-  product: Product;
+  product: ProductItem;
   qty: number;
   setQty: (n: number) => void;
   notes: string;
@@ -414,78 +514,85 @@ function CustomizeProduct({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  // Placeholder until additions are provided by backend
+  const addOptions: string[] = [];
+
   return (
-    <div>
-      <div className="mb-4 text-lg font-semibold">{product.name}</div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4">
-          <label className="block text-sm text-gray-700">Quantity</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              value={qty}
-              onChange={(e) => setQty(Math.max(1, parseInt(e.target.value || "1", 10)))}
-              className="w-24 rounded-xl border border-gray-300 px-3 py-2 text-sm"
-            />
-            <div className="text-sm text-gray-500">x ₪{product.price} = ₪{product.price * qty}</div>
-          </div>
+    <div className="space-y-4">
+      <div className="text-sm font-semibold">{product.name}</div>
 
-          <label className="block pt-2 text-sm text-gray-700">Notes</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="h-24 w-full resize-none rounded-xl border border-gray-300 px-3 py-2 text-sm"
-            placeholder="Special requests..."
-          />
+      <div className="flex items-center gap-3">
+        <label className="text-sm text-gray-700">Qty</label>
+        <input
+          type="number"
+          min={1}
+          value={qty}
+          onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
+          className="w-20 rounded-xl border border-gray-300 px-3 py-2 text-sm"
+        />
+        <div className="text-sm text-gray-700">
+          Unit price: <span className="font-medium">₪{product.price ?? 0}</span>
         </div>
-
-        <div className="space-y-3 rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="text-sm font-medium text-gray-700">Additions</div>
-          {product.additions && product.additions.length > 0 ? (
-            <ul className="grid grid-cols-2 gap-2 text-sm">
-              {product.additions.map((a) => {
-                const on = adds.includes(a);
-                return (
-                  <li key={a}>
-                    <button
-                      type="button"
-                      onClick={() => toggleAdd(a)}
-                      className={[
-                        "w-full rounded-xl border px-3 py-2",
-                        on
-                          ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                          : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50",
-                      ].join(" ")}
-                    >
-                      {a}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <div className="text-xs text-gray-400">No additions for this product.</div>
-          )}
+        <div className="text-sm text-gray-700">
+          Line total: <span className="font-semibold">₪{(product.price ?? 0) * qty}</span>
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-2">
-        <Button onClick={onConfirm}>Add to Order</Button>
-        <Button variant="secondary" onClick={onCancel}>
+      <div>
+        <div className="mb-2 text-sm font-medium text-gray-700">Additions</div>
+        {addOptions.length === 0 ? (
+          <div className="text-xs text-gray-500">No additions for this product.</div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {addOptions.map((a: string) => {
+              const selected = adds.includes(a);
+              return (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => toggleAdd(a)}
+                  className={`rounded-xl border px-3 py-1 text-xs ${
+                    selected
+                      ? "border-indigo-600 bg-indigo-50 text-indigo-700"
+                      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {selected ? "✓ " : ""}
+                  {a}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <div className="mb-2 text-sm font-medium text-gray-700">Notes</div>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="w-full rounded-xl border border-gray-300 p-2 text-sm"
+          rows={3}
+          placeholder="No ice, extra lemon…"
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-100"
+        >
           Cancel
-        </Button>
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
+        >
+          Add to Order
+        </button>
       </div>
     </div>
   );
-}
-
-/* =========================
-   Utils
-========================= */
-function arrayEq(a: string[], b: string[]) {
-  if (a.length !== b.length) return false;
-  const sa = [...a].sort();
-  const sb = [...b].sort();
-  return sa.every((x, i) => x === sb[i]);
 }
