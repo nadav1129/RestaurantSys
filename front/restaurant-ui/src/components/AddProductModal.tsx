@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import type { MenuNode } from "./MenuTree";
+import { apiFetch } from "../api/api";
 
 type ProductIngredientLineDraft = {
   ingredientId: string;
@@ -7,6 +7,8 @@ type ProductIngredientLineDraft = {
   isChangeable: boolean;
   amount: string;
 };
+
+type Ingredient = { ingredientId: string; name: string };
 
 export default function AddProductModal({
   onClose,
@@ -21,25 +23,45 @@ export default function AddProductModal({
 }) {
   const [name, setName] = useState("");
   const [isBottleOnly, setIsBottleOnly] = useState(false);
-  const [ingredients, setIngredients] = useState<
-    { ingredientId: string; name: string }[]
-  >([]);
+
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [ingLoading, setIngLoading] = useState<boolean>(false);
+  const [ingError, setIngError] = useState<string | null>(null);
 
   const [lines, setLines] = useState<ProductIngredientLineDraft[]>([
     { ingredientId: "", isLeading: false, isChangeable: false, amount: "" },
   ]);
 
-  /* ingredients */
+  /* Load ingredients (normalized) */
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/ingredients");
-        const data = await res.json();
-        setIngredients(Array.isArray(data) ? data : []);
-      } catch {
-        setIngredients([]);
+        setIngLoading(true);
+        setIngError(null);
+        const data = await apiFetch("/api/ingredients");
+
+        const list: Ingredient[] = (Array.isArray(data) ? data : []).map((x: any) => ({
+          ingredientId: x.ingredientId ?? x.ingredient_id ?? x.id,
+          name: x.name ?? x.Name,
+        }));
+
+        if (!cancelled) {
+          const cleaned = list.filter((i) => i.ingredientId && i.name);
+          setIngredients(cleaned);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setIngredients([]);
+          setIngError(e?.message || "Failed to load ingredients.");
+        }
+      } finally {
+        if (!cancelled) setIngLoading(false);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function updateLine(idx: number, patch: Partial<ProductIngredientLineDraft>) {
@@ -64,10 +86,20 @@ export default function AddProductModal({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     e.stopPropagation();
+
+    // Submit only valid lines (must have ingredientId; amount required unless bottle-only)
+    const cleaned = lines
+      .map((l) => ({
+        ...l,
+        ingredientId: (l.ingredientId || "").trim(),
+        amount: (l.amount || "").trim(),
+      }))
+      .filter((l) => l.ingredientId && (isBottleOnly ? true : l.amount));
+
     onSave({
-      name,
+      name: name.trim(),
       isBottleOnly,
-      lines,
+      lines: cleaned,
     });
   }
 
@@ -81,9 +113,7 @@ export default function AddProductModal({
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
           <div>
             <div className="text-sm font-medium text-gray-500">New Product</div>
-            <div className="text-lg font-semibold text-gray-800">
-              Create Menu Item
-            </div>
+            <div className="text-lg font-semibold text-gray-800">Create Menu Item</div>
           </div>
           <button
             onClick={onClose}
@@ -125,6 +155,17 @@ export default function AddProductModal({
             Composition / Ingredients
           </div>
 
+          {ingLoading && (
+            <div className="mb-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
+              Loading ingredients…
+            </div>
+          )}
+          {ingError && (
+            <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+              {ingError}
+            </div>
+          )}
+
           <div className="space-y-3">
             {lines.map((line, idx) => (
               <div
@@ -139,9 +180,7 @@ export default function AddProductModal({
                     <select
                       className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
                       value={line.ingredientId}
-                      onChange={(e) =>
-                        updateLine(idx, { ingredientId: e.target.value })
-                      }
+                      onChange={(e) => updateLine(idx, { ingredientId: e.target.value })}
                       required
                     >
                       <option value="">Select...</option>
@@ -172,9 +211,7 @@ export default function AddProductModal({
                         type="checkbox"
                         className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
                         checked={line.isLeading}
-                        onChange={(e) =>
-                          updateLine(idx, { isLeading: e.target.checked })
-                        }
+                        onChange={(e) => updateLine(idx, { isLeading: e.target.checked })}
                       />
                       Leading
                     </label>
@@ -184,9 +221,7 @@ export default function AddProductModal({
                         type="checkbox"
                         className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
                         checked={line.isChangeable}
-                        onChange={(e) =>
-                          updateLine(idx, { isChangeable: e.target.checked })
-                        }
+                        onChange={(e) => updateLine(idx, { isChangeable: e.target.checked })}
                       />
                       Changeable
                     </label>
@@ -228,6 +263,7 @@ export default function AddProductModal({
             <button
               type="submit"
               className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
+              disabled={!name.trim()}
             >
               Save Product
             </button>

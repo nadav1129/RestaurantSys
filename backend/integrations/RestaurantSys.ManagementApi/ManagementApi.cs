@@ -412,33 +412,41 @@ namespace RestaurantSys.Api
             /* ========== INGREDIENTS ========== */
             app.MapGet("/api/ingredients", async (NpgsqlDataSource db) =>
             {
-                const string sql = @"
-                    select ingredient_id, name
-                    from ingredients
-                    order by name;
-                ";
-
-                var list = new List<IngredientDto>();
-
-                await using var cmd = db.CreateCommand(sql);
-                await using var reader = await cmd.ExecuteReaderAsync();
-                while (await reader.ReadAsync())
+                try
                 {
-                    list.Add(new IngredientDto
+                    const string sql = @"
+            select ingredient_id, btrim(name) as name
+            from ingredients
+            order by name nulls last;
+        ";
+
+                    var list = new List<(Guid IngredientId, string Name)>();
+
+                    await using var cmd = db.CreateCommand(sql);
+                    await using var reader = await cmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
                     {
-                        IngredientId = reader.GetGuid(0),
-                        Name = reader.GetString(1)
-                    });
-                }
+                        var id = reader.GetGuid(0);
+                        var name = reader.IsDBNull(1) ? "" : reader.GetString(1);
+                        list.Add((id, name));
+                    }
 
-                return Results.Json(
-                list,
-                new System.Text.Json.JsonSerializerOptions
-                {
-                     PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                    // Shape the payload explicitly in camelCase
+                    var payload = list.Select(x => new
+                    {
+                        ingredientId = x.IngredientId,
+                        name = x.Name
+                    });
+
+                    return Results.Json(payload); // content-type: application/json
                 }
-                );
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("Error in GET /api/ingredients:\n" + ex);
+                    return Results.Problem($"GET /api/ingredients failed: {ex.Message}", statusCode: 500);
+                }
             });
+
 
             // Create new ingridient
             app.MapPost("/api/ingredients", async (HttpRequest req, NpgsqlDataSource db) =>

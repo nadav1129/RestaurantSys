@@ -11,10 +11,6 @@
       "RelativeMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|solutionrelative:backend\\integrations\\restaurantsys.managementapi\\dto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|c:\\projects\\restaurantsys\\backend\\integrations\\restaurantsys.managementapi\\sql\\schema.sql||{3B902123-F8A7-4915-9F01-361F908088D0}",
-      "RelativeMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|solutionrelative:backend\\integrations\\restaurantsys.managementapi\\sql\\schema.sql||{3B902123-F8A7-4915-9F01-361F908088D0}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|c:\\projects\\restaurantsys\\backend\\integrations\\restaurantsys.managementapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|solutionrelative:backend\\integrations\\restaurantsys.managementapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
@@ -26,23 +22,11 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Document",
               "DocumentIndex": 2,
-              "Title": "schema.sql",
-              "DocumentMoniker": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\sql\\schema.sql",
-              "RelativeDocumentMoniker": "backend\\integrations\\RestaurantSys.ManagementApi\\sql\\schema.sql",
-              "ToolTip": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\sql\\schema.sql",
-              "RelativeToolTip": "backend\\integrations\\RestaurantSys.ManagementApi\\sql\\schema.sql",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAC4AAAAaAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
-              "WhenOpened": "2025-11-04T18:57:58.311Z"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 3,
               "Title": "Program.cs",
               "DocumentMoniker": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\Program.cs",
               "RelativeDocumentMoniker": "backend\\integrations\\RestaurantSys.ManagementApi\\Program.cs",
@@ -60,7 +44,7 @@
               "RelativeDocumentMoniker": "backend\\integrations\\RestaurantSys.ManagementApi\\ManagementApi.cs",
               "ToolTip": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\ManagementApi.cs",
               "RelativeToolTip": "backend\\integrations\\RestaurantSys.ManagementApi\\ManagementApi.cs",
-              "ViewState": "AgIAAP4CAAAAAAAAAAAAADMDAABGAAAAAAAAAA==",
+              "ViewState": "AgIAACgDAAAAAAAAAAAkwDMDAABVAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-11-03T16:20:32.527Z",
               "EditorCaption": ""
@@ -73,7 +57,7 @@
               "RelativeDocumentMoniker": "backend\\integrations\\RestaurantSys.ManagementApi\\Dto.cs",
               "ToolTip": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\Dto.cs",
               "RelativeToolTip": "backend\\integrations\\RestaurantSys.ManagementApi\\Dto.cs",
-              "ViewState": "AgIAAGIAAAAAAAAAAAA7wFIAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAFEAAAAAAAAAAAAzwFkAAAApAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-10-28T17:39:05.61Z",
               "EditorCaption": ""
