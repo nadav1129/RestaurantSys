@@ -4,7 +4,7 @@ import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import ActionsPage from "./pages/ActionsPage";
 import EmptyPage from "./pages/EmptyPage";
-import OrderPage from "./pages/OrderPage";
+import OrderPage from "./pages/OrderPage/OrderPage";
 import ServicePage from "./pages/ServicePage";
 import ManagementPage from "./pages/ManagementPage";
 import type { Page } from "./types";
@@ -22,13 +22,6 @@ export default function App() {
     setPage("order");
   };
 
-  const stations = [
-    { id: "bar",       name: "Bar" },
-    { id: "floor",     name: "Floor" },
-    { id: "hostess",   name: "Hostess" },
-    { id: "checker",   name: "Checker" },
-    { id: "inventory", name: "Inventory" },
-  ];
 
   const renderPage = () => {
     switch (page) {
@@ -41,7 +34,6 @@ export default function App() {
       case "service":
         return (
           <ServicePage
-            stations={stations}
             activeStationId={activeStationId}
             onStationChange={setActiveStationId}
             onOpenOrderForTable={openOrderForTable}

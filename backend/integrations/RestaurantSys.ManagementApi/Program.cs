@@ -1,7 +1,8 @@
-﻿using System.Data;
-using Npgsql;
-
+﻿using Npgsql;
 using RestaurantSys.Api;
+using RestaurantSys.Api.Endpoints;
+using RestaurantSys.ManagementApi.Management.Menu;
+using System.Data;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,6 +30,26 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
 
 var app = builder.Build();
 app.UseCors();
+
+app.Use(async (ctx, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine("UNHANDLED ERROR: " + ex);
+        if (!ctx.Response.HasStarted)
+        {
+            ctx.Response.StatusCode = 500;
+            ctx.Response.ContentType = "application/json";
+        }
+        // keep it minimal so we don't throw again
+        await ctx.Response.WriteAsync("{\"error\":\"Unhandled server error\"}");
+    }
+});
+
 
 if (app.Environment.IsDevelopment())
 {
@@ -68,7 +89,17 @@ else
     }
 }
 // register all routes from ManagementApi.cs
-app.MapManagementApi();
+app.MapMenusEndpoints();
+app.MapMenuNodesEndpoints();
+app.MapIngredientsEndpoints();
+app.MapProductsEndpoints();
+app.MapPricesEndpoints();
+app.MapSpeedMapEndpoints();
+app.MapSettingsEndpoints();
+app.MapStationsEndpoints();
+app.MapListEndpoints();
+app.MapListStationsEndpoints();
+app.MapTableStationsEndpoints();
 
 // minimal health
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));

@@ -147,5 +147,67 @@ namespace RestaurantSys.Api
         public decimal? GlobalDiscountPct { get; set; }   /* optional partial update */
     }
 
+    /* ============ STATIONS ============ */
+    public sealed class StationDto
+    {
+        public Guid StationId { get; init; }
+        public string StationName { get; init; } = string.Empty;
+        public string StationType { get; init; } = string.Empty;
+    }
+
+    public sealed class CreateStationRequest
+    {
+        public string? StationName { get; set; }
+        public string? StationType { get; set; }
+    }
+
+    /* ============ STATIONS ============ */
+    public sealed class ListDto
+    {
+        public Guid ListId { get; init; }
+        public string Title { get; init; } = string.Empty;
+        public string ListType { get; init; } = string.Empty; // "Tables" | "Names"
+    }
+
+    public sealed class CreateListRequest
+    {
+        public string? Title { get; set; }
+        public string? ListType { get; set; } // "Tables" | "Names"
+    }
+
+    public sealed class RenameListRequest
+    {
+        public string? Title { get; set; }
+    }
+
+    public sealed class ListEntryDto
+    {
+        public Guid EntryId { get; init; }
+        public Guid ListId { get; init; }
+
+        public string Name { get; init; } = string.Empty;
+        public string Phone { get; init; } = string.Empty;
+        public string Note { get; init; } = string.Empty;
+
+        public int? NumPeople { get; init; }
+        public string? StartTime { get; init; } // "HH:mm"
+        public string? EndTime { get; init; }   // "HH:mm"
+        public int? Minutes { get; init; }
+    }
+
+    public sealed class TableDto 
+    {
+       public Guid TableId { get; set; }
+       public int TableNum { get; set; }
+    }
+
+    public sealed class CreateStationTableRequest 
+    {
+        public int TableNum { get; set; }
+    }
+    public sealed class UpdateTableRequest
+    { 
+        public int TableNum { get; set; }
+    }
 
 }

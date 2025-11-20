@@ -12,6 +12,10 @@ CREATE TABLE IF NOT EXISTS menus (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+INSERT INTO menus (menu_num, name, created_at)
+  VALUES (0, 'Default Menu', now())
+  ON CONFLICT (menu_num) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS menu_nodes (
   node_id     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   parent_id   uuid NULL REFERENCES menu_nodes(node_id) ON DELETE CASCADE,
@@ -99,6 +103,113 @@ on conflict (id) do nothing;
 create index if not exists ix_management_settings_active_menu
   on public.management_settings(active_menu_num);
 
+  /* Stations */
+CREATE TABLE IF NOT EXISTS stations (
+  station_id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  station_name  text NOT NULL CHECK (length(btrim(station_name)) > 0),
+  station_type  text NOT NULL CHECK (
+    station_type IN (
+      'Bar',
+      'Floor',
+      'Kitchen',
+      'Checker',
+      'Hostes',
+      'selector',
+      'Storage',
+      'Managment'
+    )
+  ),
+  is_active     boolean NOT NULL DEFAULT TRUE,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+/* ------------------------------------------------------------
+   Lists (supports two types: 'Tables' and 'Names')
+   ------------------------------------------------------------ */
+CREATE TABLE IF NOT EXISTS lists (
+  list_id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title      text NOT NULL CHECK (length(btrim(title)) > 0),
+  list_type  text NOT NULL CHECK (list_type IN ('Tables', 'Names')),
+  created_at timestamptz NOT NULL DEFAULT now()
+  
+);
+
+CREATE INDEX IF NOT EXISTS ix_lists_type ON lists(list_type);
+CREATE INDEX IF NOT EXISTS ix_lists_created_at ON lists(created_at);
+
+/* ------------------------------------------------------------
+   List Entries
+   For 'Names' lists: use fields name, phone, note.
+   For 'Tables' lists: also use num_people, start_time, end_time, minutes.
+   - We keep one table and let the UI/backend decide what to populate.
+   ------------------------------------------------------------ */
+CREATE TABLE IF NOT EXISTS list_entries (
+  entry_id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  list_id     uuid NOT NULL REFERENCES lists(list_id) ON DELETE CASCADE,
+  arrived boolean NOT NULL DEFAULT FALSE,
+
+  /* Common fields */
+  name        text NOT NULL DEFAULT '',
+  phone       text NOT NULL DEFAULT '',
+  note        text NOT NULL DEFAULT '',
+
+  /* 'Tables' extras (nullable when list is 'Names') */
+  num_people  integer,
+  start_time  time,
+  end_time    time,
+  minutes     integer,
+
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_list_entries_list_id ON list_entries(list_id);
+
+
+/* Junction table: which lists are attached to which stations */
+CREATE TABLE IF NOT EXISTS station_lists (
+  station_id uuid NOT NULL REFERENCES stations(station_id) ON DELETE CASCADE,
+  list_id    uuid NOT NULL REFERENCES lists(list_id)       ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (station_id, list_id)
+);
+
+CREATE INDEX IF NOT EXISTS ix_station_lists_station ON station_lists(station_id);
+CREATE INDEX IF NOT EXISTS ix_station_lists_list    ON station_lists(list_id);
+
+/* Tables: physical restaurant tables */
+CREATE TABLE IF NOT EXISTS tables (
+  table_id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  table_number  integer NOT NULL CHECK (table_number > 0),
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  -- optional: later we can add a display name / area
+  -- name         text,
+  CONSTRAINT uq_tables_table_number UNIQUE (table_number)
+);
+
+/* Many-to-many between stations and tables */
+CREATE TABLE IF NOT EXISTS station_tables (
+  station_id uuid NOT NULL REFERENCES stations(station_id) ON DELETE CASCADE,
+  table_id   uuid NOT NULL REFERENCES tables(table_id)     ON DELETE CASCADE,
+  PRIMARY KEY (station_id, table_id)
+);
+
+CREATE TABLE IF NOT EXISTS table_live_info (
+  table_id      uuid PRIMARY KEY REFERENCES tables(table_id) ON DELETE CASCADE,
+
+  /* which list entry this table is currently linked to (optional) */
+  list_entry_id uuid REFERENCES list_entries(entry_id) ON DELETE SET NULL,
+
+  /* snapshot of guest info from the list entry at the moment of linking */
+  guest_name    text,
+  phone         text,
+  note          text,
+  num_people    integer,
+  minimum       integer,         -- same units you use in list_entries (shekels / cents)
+
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+
 -- ===== Triggers & functions =====
 
 -- Default/validate menu name:
@@ -157,6 +268,29 @@ BEGIN
   END IF;
 END
 $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_proc WHERE proname = 'set_updated_at'
+  ) THEN
+    CREATE OR REPLACE FUNCTION set_updated_at()
+    RETURNS trigger AS $BODY$
+    BEGIN
+      NEW.updated_at := now();
+      RETURN NEW;
+    END;
+    $BODY$ LANGUAGE plpgsql;
+  END IF;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_table_live_info_set_updated ON table_live_info;
+
+CREATE TRIGGER trg_table_live_info_set_updated
+BEFORE UPDATE ON table_live_info
+FOR EACH ROW
+EXECUTE PROCEDURE set_updated_at();
 
 -- ===== (Optional) quick checks =====
 -- -- expect 'AAA' + root:

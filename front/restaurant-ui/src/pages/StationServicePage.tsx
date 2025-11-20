@@ -9,7 +9,7 @@ export default function StationServicePage({
   inventory,
   onOpenOrderForTable,
 }: {
-  station: Station;                         // "Bar" | "Floor"
+  station: Station;
   tables: TableInfo[];
   inventory: InventoryItem[];
   onOpenOrderForTable: (tableId: string) => void;
@@ -18,11 +18,17 @@ export default function StationServicePage({
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-4">
-      {/* Top: station inventory toggle */}
+      
+      {/* Top bar */}
       <div className="mb-4 flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-4">
-        <div className="text-lg font-semibold">{station} — Service</div>
+        <div className="text-lg font-semibold">
+          {station.stationType} — {station.stationName} Service
+        </div>
+
         <Button variant="secondary" onClick={() => setShowInv((v) => !v)}>
-          {showInv ? "Hide Inventory" : `Show ${station} Inventory`}
+          {showInv
+            ? "Hide Inventory"
+            : `Show ${station.stationName} Inventory`}
         </Button>
       </div>
 
@@ -50,7 +56,9 @@ export default function StationServicePage({
 
       {/* Tables list */}
       <div className="rounded-2xl border border-gray-200 bg-white p-4">
-        <div className="mb-3 text-sm font-semibold">Tables</div>
+        <div className="mb-3 text-sm font-semibold">
+          Tables ({station.stationName})
+        </div>
         {tables.length === 0 ? (
           <div className="text-sm text-gray-400">No tables.</div>
         ) : (
@@ -61,8 +69,8 @@ export default function StationServicePage({
                   onClick={() => onOpenOrderForTable(t.id)}
                   className="w-full rounded-2xl border border-gray-200 bg-white p-3 text-left hover:border-gray-300 hover:bg-gray-50"
                 >
-                  <div className="text-sm font-semibold">Table #{t.id}</div>
-                  {t.owner && <div className="text-xs text-gray-500">{t.owner}</div>}
+                  <div className="text-sm font-semibold">{t.owner}</div>
+
                   <div className="mt-1 text-xs">
                     Total: <span className="font-medium">₪{t.total ?? 0}</span>
                   </div>

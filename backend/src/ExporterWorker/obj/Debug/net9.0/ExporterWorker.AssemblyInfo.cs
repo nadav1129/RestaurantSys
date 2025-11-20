@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ExporterWorker")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e450049b1685144d8f42a58386031d14374f619c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1bf4865c787d5f88a6a02e4c9927a14e47591296")]
 [assembly: System.Reflection.AssemblyProductAttribute("ExporterWorker")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ExporterWorker")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

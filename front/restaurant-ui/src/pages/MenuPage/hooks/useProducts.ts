@@ -36,8 +36,8 @@ export default function useProducts(selectedNodeId: string | null) {
         }
 
         const q = search.trim();
-        const base = `/api/products?menuNodeId=${encodeURIComponent(selectedNodeId)}`;
-        const url = q ? `${base}&search=${encodeURIComponent(q)}` : base;
+        const base = '/api/products?menuNodeId=${encodeURIComponent(selectedNodeId)}';
+        const url = q ? '${base}&search=${encodeURIComponent(q)}' : base;
 
         const data = await apiFetch(url);
         if (!cancelled) {
@@ -70,10 +70,12 @@ export default function useProducts(selectedNodeId: string | null) {
   }, [selectedNodeId]);
 
   async function fetchAllProducts(search?: string) {
-  const q = search?.trim() ? `?search=${encodeURIComponent(search.trim())}` : "";
+  const trimmed = search?.trim();
+  const q = trimmed ? `?q=${encodeURIComponent(trimmed)}` : "";
   const data = await apiFetch(`/api/products${q}`);
   setAllProducts(Array.isArray(data) ? data : []);
 }
+
 
 async function fetchProductsForNode(nodeId: string | null) {
   if (!nodeId) {
@@ -81,13 +83,13 @@ async function fetchProductsForNode(nodeId: string | null) {
     setNodeProducts([]);
     return;
   }
-  const data = await apiFetch(`/api/menu-nodes/${nodeId}/products`);
+  const data = await apiFetch('/api/menu-nodes/${nodeId}/products');
   setNodeProducts(Array.isArray(data) ? data : []);
 }
 
 
   async function linkProductToNode(productId: string, nodeId: string) {
-    await apiFetch(`/api/menu-nodes/${nodeId}/products`, {
+    await apiFetch('/api/menu-nodes/${nodeId}/products', {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ productId }),

@@ -1,93 +1,147 @@
 // File: src/pages/HostessPage.tsx
-import React, { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Button from "../components/Button";
-import type { TableBlacklist, SimpleEntry } from "../types";
+import { apiFetch } from "../api/api";
+import ListDetailPanel from "./ListDetailPage";
 
-type Tab = "tables" | "entry" | "blacklist";
+type ListType = "Tables" | "Names";
+type ListDto = { listId: string; title: string; listType: ListType };
+type Tab = "tables" | "names";
 
-const mockTables: TableBlacklist[] = [
-  { id: "t1", name: "Nadav", note: "Birthday", min: 150, tableId: "12" },
-  { id: "t2", name: "Noa", note: "VIP", min: 300, tableId: "3" },
-];
-const mockEntry: SimpleEntry[] = [
-  { id: "e1", name: "Eli", note: "Walk-in" },
-  { id: "e2", name: "Maya", note: "Reservation 21:30" },
-];
-const mockBlacklist: SimpleEntry[] = [
-  { id: "b1", name: "Guy", note: "Chargeback history" },
-];
-
-export default function HostessPage() {
+export default function HostessPage({ stationId }: { stationId?: string }) {
   const [tab, setTab] = useState<Tab>("tables");
+  const [lists, setLists] = useState<ListDto[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const [openList, setOpenList] = useState<ListDto | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setLoading(true);
+        if (!stationId) {
+          if (alive) setLists([]);
+          return;
+        }
+        // backend route that returns only lists attached to this station
+        const data = (await apiFetch(`/api/stations/${stationId}/lists`)) as
+          | ListDto[]
+          | null;
+        if (alive) setLists(data ?? []);
+      } catch (err) {
+        console.error("Failed to load lists", err);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [stationId]);
+
+  const tablesLists = useMemo(
+    () => lists.filter((l) => l.listType === "Tables"),
+    [lists]
+  );
+  const namesLists = useMemo(
+    () => lists.filter((l) => l.listType === "Names"),
+    [lists]
+  );
+
+  function applyListMeta(updated: ListDto) {
+    setLists((prev) =>
+      prev.map((x) => (x.listId === updated.listId ? updated : x))
+    );
+    setOpenList(updated);
+  }
+
+  if (!stationId) {
+    return (
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900">
+        Choose a station to see its lists.
+      </div>
+    );
+  }
+
+  if (openList) {
+    return (
+      <div className="mx-auto max-w-[1200px] px-4 py-4">
+        <ListDetailPanel list={openList} onClose={() => setOpenList(null)} />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-[1200px] px-4 py-4">
       {/* Tabs */}
       <div className="mb-4 flex gap-2">
-        <Button variant={tab === "tables" ? "primary" : "secondary"} onClick={() => setTab("tables")}>
-          Tables
+        <Button
+          variant={tab === "tables" ? "primary" : "secondary"}
+          onClick={() => setTab("tables")}
+        >
+          Tables Lists
         </Button>
-        <Button variant={tab === "entry" ? "primary" : "secondary"} onClick={() => setTab("entry")}>
-          Entry
-        </Button>
-        <Button variant={tab === "blacklist" ? "primary" : "secondary"} onClick={() => setTab("blacklist")}>
-          Blacklist
+        <Button
+          variant={tab === "names" ? "primary" : "secondary"}
+          onClick={() => setTab("names")}
+        >
+          Names Lists
         </Button>
       </div>
 
       <div className="rounded-2xl border border-gray-200 bg-white p-4">
-        {tab === "tables" && (
-          <ListTables data={mockTables} />
-        )}
-        {tab === "entry" && (
-          <ListPeople title="Entry" data={mockEntry} />
-        )}
-        {tab === "blacklist" && (
-          <ListPeople title="Blacklist" data={mockBlacklist} />
+        {loading ? (
+          <div className="text-sm text-gray-600">Loading…</div>
+        ) : tab === "tables" ? (
+          <ListsGrid
+            lists={tablesLists}
+            emptyText="No Tables lists yet."
+            onOpen={setOpenList}
+          />
+        ) : (
+          <ListsGrid
+            lists={namesLists}
+            emptyText="No Names lists yet."
+            onOpen={setOpenList}
+          />
         )}
       </div>
     </div>
   );
 }
 
-function ListTables({ data }: { data: TableBlacklist[] }) {
+function ListsGrid({
+  lists,
+  emptyText,
+  onOpen,
+}: {
+  lists: ListDto[];
+  emptyText: string;
+  onOpen: (l: ListDto) => void;
+}) {
+  if (lists.length === 0) {
+    return <div className="text-sm text-gray-600">{emptyText}</div>;
+  }
   return (
-    <>
-      <div className="mb-3 text-sm font-semibold">Reserved / Seated Tables</div>
-      <ul className="divide-y">
-        {data.map((t) => (
-          <li key={t.id} className="flex items-center justify-between py-3">
-            <div>
-              <div className="font-medium">{t.name}</div>
-              <div className="text-xs text-gray-500">
-                ID: {t.id} · Table: {t.tableId ?? "-"} · Min: ₪{t.min ?? 0}
+    <ul className="grid gap-3 md:grid-cols-2">
+      {lists.map((l) => (
+        <li key={l.listId} className="rounded-xl border border-gray-200 p-3">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-gray-800">
+                {l.title}
               </div>
-              {t.note && <div className="text-xs text-gray-600">{t.note}</div>}
+              <div className="truncate text-xs text-gray-500">{l.listType}</div>
             </div>
-            <Button variant="secondary">Details</Button>
-          </li>
-        ))}
-      </ul>
-    </>
-  );
-}
-
-function ListPeople({ title, data }: { title: string; data: SimpleEntry[] }) {
-  return (
-    <>
-      <div className="mb-3 text-sm font-semibold">{title}</div>
-      <ul className="divide-y">
-        {data.map((p) => (
-          <li key={p.id} className="flex items-center justify-between py-3">
-            <div>
-              <div className="font-medium">{p.name}</div>
-              <div className="text-xs text-gray-500">ID: {p.id}</div>
-              {p.note && <div className="text-xs text-gray-600">{p.note}</div>}
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => onOpen(l)}>
+                Open
+              </Button>
             </div>
-            <Button variant="secondary">Details</Button>
-          </li>
-        ))}
-      </ul>
-    </>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }

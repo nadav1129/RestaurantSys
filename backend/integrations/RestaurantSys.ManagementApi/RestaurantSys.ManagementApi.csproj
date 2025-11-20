@@ -18,6 +18,11 @@
   </Content>
 </ItemGroup>
 
+<ItemGroup>
+  <Folder Include="Floor\" />
+  <Folder Include="Hostess\" />
+</ItemGroup>
+
 
 
 </Project>

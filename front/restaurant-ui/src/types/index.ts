@@ -10,8 +10,8 @@ export type Page =
 
 export type TableInfo = {
   id: string;          // e.g., "12"
-  owner?: string;      // e.g., "Nadav"
-  total?: number;      // e.g., 128
+  owner: string;      // e.g., "Nadav"
+  total: number;      // e.g., 128
 };
 
 export type InventoryItem = {
@@ -20,7 +20,27 @@ export type InventoryItem = {
   qty: number;
 };
 
-export type Station = "Bar" | "Floor" | "Hostess" | "Kitchen";
+// src/types/index.ts
+
+/* Fixed set of station TYPES (not unique names) */
+export const STATION_TYPES = [
+  "Bar",
+  "Floor",
+  "Kitchen",
+  "Checker",
+  "Hostes",
+  "selector",
+  "Storage",
+  "Managment",
+] as const;
+
+export type StationType = (typeof STATION_TYPES)[number];
+
+export type Station = {
+  stationId: string;
+  stationName: string;
+  stationType: StationType;
+};
 
 export type Meal = {
   id: string;

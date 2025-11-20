@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import Button from "../components/Button";
-import { apiFetch } from "../api/api";
+import Button from "../../components/Button";
+import { apiFetch } from "../../api/api";
+import OrderInfoCard from "./OrderInfoCard";
 
 /* =========================
    Types
@@ -18,7 +19,7 @@ type ProductItem = {
 type MenuNode = {
   id: string;
   name: string;
-  isLeaf?: boolean;      // may be unreliable from backend; we also infer via children
+  isLeaf?: boolean; // may be unreliable from backend; we also infer via children
   children?: MenuNode[];
   products?: ProductItem[]; // populated when we enter a leaf and fetch products
 };
@@ -40,7 +41,7 @@ type ApiNode = {
   id: string;
   parentId: string | null;
   name: string;
-  isLeaf: boolean;       // may not be trustworthy; we still infer from children
+  isLeaf: boolean; // may not be trustworthy; we still infer from children
   children?: ApiNode[];
 };
 
@@ -51,9 +52,9 @@ type ApiNode = {
 // IMPORTANT: only treat explicit true as leaf.
 // If backend sends isLeaf: false for real leaves, we still infer by children.
 function isLeaf(node: MenuNode): boolean {
-  if (node.isLeaf === true) return true;                           // explicit true
-  if (node.products && node.products.length > 0) return true;      // we already have products
-  return !node.children || node.children.length === 0;             // no children -> leaf
+  if (node.isLeaf === true) return true; // explicit true
+  if (node.products && node.products.length > 0) return true; // we already have products
+  return !node.children || node.children.length === 0; // no children -> leaf
 }
 
 // Map ApiNode -> MenuNode (categories only in this endpoint)
@@ -80,8 +81,19 @@ export default function OrderPage() {
   // “Quick order” table default is none
   const [table, setTable] = useState<string>("none");
 
+  // Reservation / guest fields
+  const [guestName, setGuestName] = useState<string>("");
+  const [diners, setDiners] = useState<string>("");
+  const [phone, setPhone] = useState<string>("");
+  const [note, setNote] = useState<string>("");
+
+  // Fixed time fields
+  const [startTime] = useState<Date>(() => new Date());
+  const [endTime, setEndTime] = useState<Date | null>(null);
+
   // Order/cart
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [orderConfirmed, setOrderConfirmed] = useState<boolean>(false);
 
   // menu + settings
   const [discountPct, setDiscountPct] = useState<number>(0);
@@ -105,6 +117,13 @@ export default function OrderPage() {
   // Cache of nodeId -> products so re-entering a category restores its products instantly
   const productCacheRef = useRef<Map<string, ProductItem[]>>(new Map());
 
+  // Reset confirmation when cart is cleared
+  useEffect(() => {
+    if (cart.length === 0) {
+      setOrderConfirmed(false);
+      setEndTime(null);
+    }
+  }, [cart.length]);
 
   // load active settings + selected menu tree (correct endpoint)
   useEffect(() => {
@@ -159,80 +178,79 @@ export default function OrderPage() {
   const parent = path.length > 1 ? path[path.length - 2] : null;
 
   useEffect(() => {
-  if (!current) return;
+    if (!current) return;
 
-  // Only consider nodes that look like leaves (no children or explicitly leaf)
-  if (!isLeaf(current)) return;
+    // Only consider nodes that look like leaves (no children or explicitly leaf)
+    if (!isLeaf(current)) return;
 
-  // If node already has products on it, we’re done
-  if (Array.isArray(current.products)) return;
+    // If node already has products on it, we’re done
+    if (Array.isArray(current.products)) return;
 
-  // If we’ve fetched before, hydrate from cache and stop
-  const cached = productCacheRef.current.get(current.id);
-  if (cached) {
-    setPath((prev) => {
-      if (prev.length === 0) return prev;
-      const next = prev.slice();
-      const i = next.length - 1;
-      next[i] = { ...next[i], products: cached, isLeaf: true };
-      return next;
-    });
-    return;
-  }
-
-  (async () => {
-    try {
-      const arr = (await apiFetch(
-        `/api/menu-nodes/${current.id}/products`
-      )) as Array<{ id: string; name: string; type: string; price: number | null }>;
-
-      // Map backend cents -> UI shekels (remove /100 if already in shekels)
-      const mapped: ProductItem[] = (arr ?? []).map((x) => ({
-        id: x.id,
-        name: x.name,
-        type: x.type,
-        price: (x.price ?? 0) / 100,
-      }));
-
-      // Cache it
-      productCacheRef.current.set(current.id, mapped);
-
-      // 1) Update the node in the current path
+    // If we’ve fetched before, hydrate from cache and stop
+    const cached = productCacheRef.current.get(current.id);
+    if (cached) {
       setPath((prev) => {
         if (prev.length === 0) return prev;
         const next = prev.slice();
         const i = next.length - 1;
-        next[i] = { ...next[i], products: mapped, isLeaf: true };
+        next[i] = { ...next[i], products: cached, isLeaf: true };
         return next;
       });
-
-      // 2) Also update the node inside the tree (so parent.children holds hydrated child)
-      setRoot((prev) => {
-        if (!prev) return prev;
-
-        const apply = (n: MenuNode): MenuNode => {
-          if (n.id === current.id) {
-            return { ...n, products: mapped, isLeaf: true };
-          }
-          if (!n.children || n.children.length === 0) return n;
-          let changed = false;
-          const children = n.children.map((c) => {
-            const cc = apply(c);
-            if (cc !== c) changed = true;
-            return cc;
-          });
-          return changed ? { ...n, children } : n;
-        };
-
-        return apply(prev);
-      });
-    } catch {
-      // Optionally set an error banner
-      // setError("Failed to load products for this category.");
+      return;
     }
-  })();
-}, [current?.id]);
 
+    (async () => {
+      try {
+        const arr = (await apiFetch(
+          `/api/menu-nodes/${current.id}/products`
+        )) as Array<{ id: string; name: string; type: string; price: number | null }>;
+
+        // Map backend cents -> UI shekels (remove /100 if already in shekels)
+        const mapped: ProductItem[] = (arr ?? []).map((x) => ({
+          id: x.id,
+          name: x.name,
+          type: x.type,
+          price: (x.price ?? 0) / 100,
+        }));
+
+        // Cache it
+        productCacheRef.current.set(current.id, mapped);
+
+        // 1) Update the node in the current path
+        setPath((prev) => {
+          if (prev.length === 0) return prev;
+          const next = prev.slice();
+          const i = next.length - 1;
+          next[i] = { ...next[i], products: mapped, isLeaf: true };
+          return next;
+        });
+
+        // 2) Also update the node inside the tree (so parent.children holds hydrated child)
+        setRoot((prev) => {
+          if (!prev) return prev;
+
+          const apply = (n: MenuNode): MenuNode => {
+            if (n.id === current.id) {
+              return { ...n, products: mapped, isLeaf: true };
+            }
+            if (!n.children || n.children.length === 0) return n;
+            let changed = false;
+            const children = n.children.map((c) => {
+              const cc = apply(c);
+              if (cc !== c) changed = true;
+              return cc;
+            });
+            return changed ? { ...n, children } : n;
+          };
+
+          return apply(prev);
+        });
+      } catch {
+        // Optionally set an error banner
+        // setError("Failed to load products for this category.");
+      }
+    })();
+  }, [current?.id]);
 
   // If at leaf: show its products (or whenever we have products)
   const currentProducts = useMemo(() => {
@@ -243,8 +261,10 @@ export default function OrderPage() {
 
   // Totals
   const subtotal = cart.reduce((s, c) => s + c.qty * c.price, 0);
-  const service = Math.round(subtotal * 0.1);
-  const total = subtotal + service;
+  const total = subtotal; // raw total (no service)
+  const only10 = Math.round(total * 0.1);
+  const totalWith10 = total + only10;
+  const minimum = total; // TODO: wire real minimum from settings if/when you have it
 
   /* -------- Category navigation -------- */
   const enterNode = (node: MenuNode) => setPath((p) => [...p, node]);
@@ -260,8 +280,6 @@ export default function OrderPage() {
     setCustomAdds([]);
     setMode("customize");
   };
-  const toggleAddition = (add: string) =>
-    setCustomAdds((prev) => (prev.includes(add) ? prev.filter((a) => a !== add) : [...prev, add]));
 
   const confirmAddToOrder = () => {
     if (!selectedProduct) return;
@@ -288,51 +306,71 @@ export default function OrderPage() {
     setSelectedProduct(null);
   };
 
-  const removeCartItem = (index: number) => setCart((prev) => prev.filter((_, i) => i !== index));
+  const removeCartItem = (index: number) =>
+    setCart((prev) => prev.filter((_, i) => i !== index));
+
+  const handleTopButtonClick = () => {
+    if (cart.length === 0) return;
+
+    if (!orderConfirmed) {
+      setOrderConfirmed(true);
+      return;
+    }
+
+    // Pay now
+    const now = new Date();
+    setEndTime(now);
+    alert(
+      `Pay ₪${totalWith10} for table ${table} (Total: ₪${total}, Tip (10%): ₪${only10})`
+    );
+  };
 
   /* =========================
      Render
   ========================= */
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-4">
-      {/* Top panel: table + totals */}
-      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="text-sm text-gray-500">Table</div>
-          <input
-            className="w-28 rounded-xl border border-gray-300 px-3 py-2 text-sm"
-            value={table}
-            onChange={(e) => setTable(e.target.value)}
-            placeholder="none"
-          />
-          <div className="ml-4 text-xs text-gray-500">
-            (Leave as <b>none</b> for Quick Order)
-          </div>
-        </div>
-        <div className="flex items-center gap-6 text-sm">
-          <div>
-            <span className="text-gray-500">Subtotal: </span>
-            <span className="font-medium">₪{subtotal}</span>
-          </div>
-          <div>
-            <span className="text-gray-500">Service (10%): </span>
-            <span className="font-medium">₪{service}</span>
-          </div>
-          <div className="text-base">
-            <span className="text-gray-500">Total: </span>
-            <span className="font-semibold">₪{total}</span>
-          </div>
-          <Button onClick={() => alert(`Send order for table ${table} (₪${total})`)}>
-            Confirm Order
-          </Button>
-        </div>
-      </div>
+      {/* Top info card */}
+      <OrderInfoCard
+        table={table}
+        setTable={setTable}
+        guestName={guestName}
+        setGuestName={setGuestName}
+        diners={diners}
+        setDiners={setDiners}
+        phone={phone}
+        setPhone={setPhone}
+        note={note}
+        setNote={setNote}
+        startTime={startTime}
+        endTime={endTime}
+        minimum={minimum}
+        total={total}
+        totalWith10={totalWith10}
+        only10={only10}
+        orderConfirmed={orderConfirmed}
+        onTopButtonClick={handleTopButtonClick}
+        hasItems={cart.length > 0}
+      />
 
       {/* Main layout: Order list (left) + Content (center) + Category (right) */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(260px,1fr)_minmax(420px,2fr)_minmax(260px,1fr)]">
         {/* Left: current order list */}
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="mb-3 text-sm font-semibold">Order Items</div>
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-sm font-semibold">Order Items</div>
+            <Button
+              variant={orderConfirmed ? "secondary" : "primary"}
+              className="text-xs"
+              disabled={cart.length === 0 || orderConfirmed}
+              onClick={() => {
+                if (cart.length === 0) return;
+                setOrderConfirmed(true);
+              }}
+            >
+              {orderConfirmed ? "Confirmed" : "Confirm"}
+            </Button>
+          </div>
           {cart.length === 0 ? (
             <div className="py-8 text-center text-sm text-gray-400">No items yet.</div>
           ) : (
@@ -354,7 +392,11 @@ export default function OrderPage() {
                         </div>
                       )}
                     </div>
-                    <Button variant="secondary" onClick={() => removeCartItem(idx)} className="text-xs">
+                    <Button
+                      variant="secondary"
+                      onClick={() => removeCartItem(idx)}
+                      className="text-xs"
+                    >
                       Remove
                     </Button>
                   </div>
