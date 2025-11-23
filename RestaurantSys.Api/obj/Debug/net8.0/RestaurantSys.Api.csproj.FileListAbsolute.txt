@@ -1,5 +1,0 @@
-C:\Projects\RestaurantSys\RestaurantSys.Api\obj\Debug\net8.0\RestaurantSys.Api.csproj.AssemblyReference.cache
-C:\Projects\RestaurantSys\RestaurantSys.Api\obj\Debug\net8.0\RestaurantSys.Api.GeneratedMSBuildEditorConfig.editorconfig
-C:\Projects\RestaurantSys\RestaurantSys.Api\obj\Debug\net8.0\RestaurantSys.Api.AssemblyInfoInputs.cache
-C:\Projects\RestaurantSys\RestaurantSys.Api\obj\Debug\net8.0\RestaurantSys.Api.AssemblyInfo.cs
-C:\Projects\RestaurantSys\RestaurantSys.Api\obj\Debug\net8.0\RestaurantSys.Api.csproj.CoreCompileInputs.cache

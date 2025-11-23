@@ -210,6 +210,19 @@ CREATE TABLE IF NOT EXISTS table_live_info (
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
+/* App users */
+CREATE TABLE IF NOT EXISTS app_users (
+  user_id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name           text NOT NULL CHECK (length(btrim(name)) > 0),
+  role           text NOT NULL CHECK (role IN ('user', 'admin')),
+  passcode_hash  text NOT NULL,
+  created_at     timestamptz NOT NULL DEFAULT now()
+);
+
+/* Optional: prevent two users with same name (case-insensitive) */
+CREATE UNIQUE INDEX IF NOT EXISTS ux_app_users_name_ci
+  ON app_users (lower(name));
+
 -- ===== Triggers & functions =====
 
 -- Default/validate menu name:

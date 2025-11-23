@@ -1,4 +1,9 @@
-﻿using Npgsql;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Npgsql;
 using RestaurantSys.Api;
 using RestaurantSys.Api.Endpoints;
 using RestaurantSys.ManagementApi.Management.Menu;
@@ -6,6 +11,28 @@ using System.Data;
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+// TODO: move to config/env var for real use
+const string JwtKey = "super-secret-dev-key-change-me";
+
+// JWT auth
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = false,
+            ValidateAudience = false,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtKey)),
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
+
+builder.Services.AddAuthorization();
+
 
 // bind predictable dev port
 builder.WebHost.UseUrls("http://0.0.0.0:8080");
@@ -100,6 +127,11 @@ app.MapStationsEndpoints();
 app.MapListEndpoints();
 app.MapListStationsEndpoints();
 app.MapTableStationsEndpoints();
+app.MapUserEndpoints();
+
+//JWT
+app.UseAuthentication();
+app.UseAuthorization();
 
 // minimal health
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));

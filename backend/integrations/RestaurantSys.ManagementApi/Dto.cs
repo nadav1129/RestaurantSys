@@ -195,19 +195,41 @@ namespace RestaurantSys.Api
         public int? Minutes { get; init; }
     }
 
-    public sealed class TableDto 
+    public sealed class TableDto
     {
-       public Guid TableId { get; set; }
-       public int TableNum { get; set; }
+        public Guid TableId { get; set; }
+        public int TableNum { get; set; }
     }
 
-    public sealed class CreateStationTableRequest 
+    public sealed class CreateStationTableRequest
     {
         public int TableNum { get; set; }
     }
     public sealed class UpdateTableRequest
-    { 
+    {
         public int TableNum { get; set; }
     }
 
+    public sealed class UserDto
+    {
+        public Guid UserId { get; set; }
+        public string Name { get; set; }
+        public string Role { get; set; }
+
+    }
+
+    public sealed class CreateUserRequest
+    {
+        public string Name { get; set; }
+        public string Role { get; set; }
+        public string Passcode { get; set; }
+
+    }
+
+    public sealed class LoginRequest
+    {
+        public Guid UserId { get; set; }
+        public string Passcode { get; set; }
+
+    }
 }

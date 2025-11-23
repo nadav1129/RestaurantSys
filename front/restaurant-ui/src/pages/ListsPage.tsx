@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Button from "../components/Button";
 import { apiFetch } from "../api/api";
+import ListDetailPanel from ".//ListDetailPage";
 
 /* Fixed set of LIST TYPES */
 export const LIST_TYPES = ["Tables", "Names"] as const;
@@ -28,15 +29,15 @@ type ListEntryDto = {
 
   numPeople: number | null;
   startTime: string | null; // "HH:MM" or null
-  endTime: string | null;   // "HH:MM" or null
+  endTime: string | null; // "HH:MM" or null
   minutes: number | null;
 };
 
 /* ===== Local UI types ===== */
 type ListRow = {
   id: string;
-  type: ListType; /* "Tables" | "Names" */
-  title: string;  /* user-chosen list name */
+  type: ListType /* "Tables" | "Names" */;
+  title: string /* user-chosen list name */;
 };
 
 type OpenMap = Record<string, boolean>;
@@ -53,7 +54,7 @@ type BaseEntry = {
 type TableEntry = BaseEntry & {
   numPeople: number | null;
   startTime: string; // "HH:MM"
-  endTime: string;   // "HH:MM"
+  endTime: string; // "HH:MM"
   minutes: number | null;
 };
 
@@ -78,10 +79,9 @@ function ListCard({ row }: { row: ListRow }) {
   async function handleRefreshList() {
     try {
       setLoading(true);
-      const rows = (await apiFetch(
-        `/api/lists/${row.id}/entries`,
-        { method: "GET" }
-      )) as ListEntryDto[] | null;
+      const rows = (await apiFetch(`/api/lists/${row.id}/entries`, {
+        method: "GET",
+      })) as ListEntryDto[] | null;
 
       if (!rows) {
         setNameEntries([]);
@@ -139,7 +139,11 @@ function ListCard({ row }: { row: ListRow }) {
           <Button variant="secondary" onClick={handleDumpList}>
             Dump list
           </Button>
-          <Button variant="secondary" onClick={handleRefreshList} disabled={loading}>
+          <Button
+            variant="secondary"
+            onClick={handleRefreshList}
+            disabled={loading}
+          >
             {loading ? "Refreshing..." : "Refresh list"}
           </Button>
         </div>
@@ -210,6 +214,7 @@ export default function ListsPage() {
   const [open, setOpen] = useState<OpenMap>({});
   const [selected, setSelected] = useState<SelectMap>({});
   const [addOpen, setAddOpen] = useState(false);
+  const [openList, setOpenList] = useState<ListDto | null>(null);
 
   /* Add form state */
   const [addType, setAddType] = useState<ListType>("Tables");
@@ -220,8 +225,7 @@ export default function ListsPage() {
     [rows, selected]
   );
 
-  const toggleOpen = (id: string) =>
-    setOpen((o) => ({ ...o, [id]: !o[id] }));
+  const toggleOpen = (id: string) => setOpen((o) => ({ ...o, [id]: !o[id] }));
 
   const toggleSelect = (id: string) =>
     setSelected((s) => ({ ...s, [id]: !s[id] }));
@@ -302,6 +306,14 @@ export default function ListsPage() {
     }
   }
 
+  if (openList) {
+    return (
+      <div className="mx-auto max-w-[1000px] px-4 py-4">
+        <ListDetailPanel list={openList} onClose={() => setOpenList(null)} />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-[1000px] px-4 py-4">
       {/* Header */}
@@ -365,12 +377,11 @@ export default function ListsPage() {
       <div className="space-y-3">
         {rows.length === 0 ? (
           <div className="rounded-2xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
-            No lists yet. Click{" "}
-            <span className="font-medium">+ Add List</span> to start.
+            No lists yet. Click <span className="font-medium">+ Add List</span>{" "}
+            to start.
           </div>
         ) : (
           rows.map((row) => {
-            const isOpen = !!open[row.id];
             return (
               <div
                 key={row.id}
@@ -396,20 +407,19 @@ export default function ListsPage() {
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => toggleOpen(row.id)}
+                      onClick={() =>
+                        setOpenList({
+                          listId: row.id,
+                          title: row.title,
+                          listType: row.type,
+                        })
+                      }
                       className="rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium hover:bg-gray-50"
                     >
-                      {isOpen ? "Collapse" : "Expand"}
+                      Open
                     </button>
                   </div>
                 </div>
-
-                {/* Expanded content */}
-                {isOpen && (
-                  <div className="border-t px-4 py-3">
-                    <ListCard row={row} />
-                  </div>
-                )}
               </div>
             );
           })
