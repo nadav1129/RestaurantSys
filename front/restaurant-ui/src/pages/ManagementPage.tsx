@@ -4,12 +4,20 @@ import SpeedPage from "./SpeedPage";
 import ManagementSettingsPage from "./ManagementSettingsPage";
 import StationsPage from "./StationsPage/StationsPage";
 import ListsPage from "./ListsPage";
+import DashboardPage from "./DashboardPage";
 
 export default function ManagementPage() {
   /* which sub-view is active? "menu" | "speed" */
   const [activeTab, setActiveTab] = useState<
-    "menu" | "speed" | "stations" | "lists" | "settings"
-  >("menu");
+    "dashboard" | "menu" | "stations" | "lists" | "settings"
+  >("dashboard");
+
+  const [hasActiveShift, setHasActiveShift] = useState(false);
+
+  const handleStartShift = () => {
+    // TODO: call API to start shift
+    setHasActiveShift(true);
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
@@ -27,6 +35,18 @@ export default function ManagementPage() {
 
         {/* Tabs / actions */}
         <div className="flex items-center gap-2">
+        <button
+            onClick={() => setActiveTab("dashboard")}
+            className={[
+              "rounded-xl border px-3 py-2 text-sm font-medium",
+              activeTab === "dashboard"
+                ? "border-gray-900 bg-gray-900 text-white"
+                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
+            ].join(" ")}
+          >
+            Dashboard
+          </button>
+
           <button
             onClick={() => setActiveTab("menu")}
             className={[
@@ -39,7 +59,7 @@ export default function ManagementPage() {
             Menu Builder
           </button>
 
-          <button
+          {/* <button
             onClick={() => setActiveTab("speed")}
             className={[
               "rounded-xl border px-3 py-2 text-sm font-medium",
@@ -49,13 +69,13 @@ export default function ManagementPage() {
             ].join(" ")}
           >
             Speed Rail
-          </button>
+          </button> */}
 
           <button
             onClick={() => setActiveTab("stations")}
             className={[
               "rounded-xl border px-3 py-2 text-sm font-medium",
-              activeTab === "settings"
+              activeTab === "stations"
                 ? "border-gray-900 bg-gray-900 text-white"
                 : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
             ].join(" ")}
@@ -67,7 +87,7 @@ export default function ManagementPage() {
             onClick={() => setActiveTab("lists")}
             className={[
               "rounded-xl border px-3 py-2 text-sm font-medium",
-              activeTab === "settings"
+              activeTab === "lists"
                 ? "border-gray-900 bg-gray-900 text-white"
                 : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
             ].join(" ")}
@@ -91,17 +111,27 @@ export default function ManagementPage() {
 
       {/* Body */}
       <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+
+        {activeTab === "dashboard" && (
+          <div className="rounded-xl border border-gray-200 bg-gray-100">
+            <DashboardPage 
+            hasActiveShift={hasActiveShift}
+            onStartShift={handleStartShift}
+            />
+          </div>
+        )}
+
         {activeTab === "menu" && (
           <div className="rounded-xl border border-gray-200 bg-gray-100">
             <MenuPage />
           </div>
         )}
 
-        {activeTab === "speed" && (
+        {/* {activeTab === "speed" && (
           <div className="rounded-xl border border-gray-200 bg-white">
             <SpeedPage />
           </div>
-        )}
+        )} */}
 
         {activeTab === "stations" && (
           <div className="rounded-xl border border-gray-200 bg-white">

@@ -3,7 +3,7 @@ SET search_path = public;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;  -- for gen_random_uuid()
 
 
--- ===== Tables =====
+/* ===== Tables ===== */
 
 /* Menues */
 CREATE TABLE IF NOT EXISTS menus (
@@ -210,18 +210,176 @@ CREATE TABLE IF NOT EXISTS table_live_info (
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
+/* ===== Workers ===== */
+CREATE TABLE IF NOT EXISTS workers (
+  worker_id     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  first_name    text NOT NULL CHECK (length(btrim(first_name)) > 0),
+  last_name     text NOT NULL CHECK (length(btrim(last_name)) > 0),
+
+  /* Personal ID (teudat zehut), optional for now */
+  personal_id   text,
+
+  email         text,
+  phone         text,
+
+  position      text NOT NULL CHECK (length(btrim(position)) > 0),
+
+  /* Salary in cents (so 10,000.00₪ = 1,000,000) */
+  salary_cents  int,
+
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
 /* App users */
 CREATE TABLE IF NOT EXISTS app_users (
   user_id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name           text NOT NULL CHECK (length(btrim(name)) > 0),
+
+  worker_id      uuid NOT NULL
+                 REFERENCES workers(worker_id)
+                 ON DELETE CASCADE,
+
   role           text NOT NULL CHECK (role IN ('user', 'admin')),
   passcode_hash  text NOT NULL,
   created_at     timestamptz NOT NULL DEFAULT now()
 );
 
+/* One login per worker */
+CREATE UNIQUE INDEX IF NOT EXISTS ux_app_users_worker
+  ON app_users (worker_id);
+
+
 /* Optional: prevent two users with same name (case-insensitive) */
 CREATE UNIQUE INDEX IF NOT EXISTS ux_app_users_name_ci
   ON app_users (lower(name));
+
+
+/* ===== Shifts ===== */
+CREATE TABLE IF NOT EXISTS shifts (
+  shift_id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        text,
+  planned_start_at timestamptz,
+  planned_end_at   timestamptz,
+  started_at  timestamptz,
+  ended_at    timestamptz,
+  status      text NOT NULL DEFAULT 'planned'
+              CHECK (status IN ('planned', 'active', 'closed', 'cancelled')),
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_shifts_status      ON shifts(status);
+CREATE INDEX IF NOT EXISTS ix_shifts_started_at  ON shifts(started_at);
+
+
+/* ===== Workers per shift ===== */
+CREATE TABLE IF NOT EXISTS shift_workers (
+  shift_worker_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  shift_id   uuid NOT NULL REFERENCES shifts(shift_id)   ON DELETE CASCADE,
+  worker_id  uuid NOT NULL REFERENCES workers(worker_id) ON DELETE RESTRICT,
+
+  station_id uuid REFERENCES stations(station_id) ON DELETE SET NULL,
+
+  position_snapshot       text NOT NULL,
+  salary_cents_snapshot   int,
+
+  started_at timestamptz NOT NULL,
+  ended_at   timestamptz,
+
+  device_type text NOT NULL DEFAULT 'fixed'
+              CHECK (device_type IN ('fixed', 'personal')),
+
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_shift_workers_shift   ON shift_workers(shift_id);
+CREATE INDEX IF NOT EXISTS ix_shift_workers_worker  ON shift_workers(worker_id);
+CREATE INDEX IF NOT EXISTS ix_shift_workers_station ON shift_workers(station_id);
+
+
+/* ===== Orders (per table / guest) ===== */
+CREATE TABLE IF NOT EXISTS orders (
+  order_id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- Which shift this order belongs to
+  shift_id   uuid NOT NULL REFERENCES shifts(shift_id)   ON DELETE RESTRICT,
+
+  -- Physical table (nullable for bar orders etc.)
+  table_id   uuid REFERENCES tables(table_id) ON DELETE SET NULL,
+
+  -- Who opened the order (device owner / station worker)
+  opened_by_worker_id uuid REFERENCES workers(worker_id) ON DELETE SET NULL,
+
+  -- Who closed/paid the order (can be same or different)
+  closed_by_worker_id uuid REFERENCES workers(worker_id) ON DELETE SET NULL,
+
+  -- Where this came from (matches your UI use-cases)
+  source     text NOT NULL DEFAULT 'table'
+             CHECK (source IN ('table', 'bar', 'takeaway', 'delivery', 'other')),
+
+  status     text NOT NULL DEFAULT 'open'
+             CHECK (status IN ('open', 'closed', 'cancelled')),
+
+  opened_at  timestamptz NOT NULL DEFAULT now(),
+  closed_at  timestamptz,
+
+  /* ===== Frontend fields from OrderInfoCard / OrderPage ===== */
+
+  guest_name   text,
+  guest_phone  text,
+  diners_count int CHECK (diners_count IS NULL OR diners_count >= 0),
+
+  note         text,
+
+  -- Table minimum for this order (in cents)
+  min_spend_cents          int,
+
+  -- “Cost”: sum of items at time of closing (in cents, no tip)
+  total_before_tip_cents   int,
+
+  -- Tip/service amount in cents (your “only10”)
+  tip_cents                int,
+
+  -- total_before_tip_cents + tip_cents
+  total_cents              int,
+
+  -- What was actually paid (handles rounding / discounts)
+  paid_cents               int,
+
+  payment_status text NOT NULL DEFAULT 'unpaid'
+                 CHECK (payment_status IN ('unpaid','partial','paid')),
+
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_orders_shift      ON orders(shift_id);
+CREATE INDEX IF NOT EXISTS ix_orders_table      ON orders(table_id);
+CREATE INDEX IF NOT EXISTS ix_orders_status     ON orders(status);
+CREATE INDEX IF NOT EXISTS ix_orders_opened_at  ON orders(opened_at);
+
+
+/* ===== Order items ===== */
+CREATE TABLE IF NOT EXISTS order_items (
+  order_item_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  order_id   uuid NOT NULL REFERENCES orders(order_id)   ON DELETE CASCADE,
+  product_id uuid NOT NULL REFERENCES products(product_id) ON DELETE RESTRICT,
+
+  quantity   int NOT NULL CHECK (quantity > 0),
+
+  -- Snapshot of price in cents
+  price_cents  int NOT NULL,
+
+  entered_by_worker_id uuid REFERENCES workers(worker_id) ON DELETE SET NULL,
+
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS ix_order_items_order   ON order_items(order_id);
+CREATE INDEX IF NOT EXISTS ix_order_items_product ON order_items(product_id);
+CREATE INDEX IF NOT EXISTS ix_order_items_worker  ON order_items(entered_by_worker_id);
+
+
 
 -- ===== Triggers & functions =====
 

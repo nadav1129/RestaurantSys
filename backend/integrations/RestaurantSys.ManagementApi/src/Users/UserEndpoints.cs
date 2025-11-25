@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Npgsql;
 using RestaurantSys.Api;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace RestaurantSys.Api.Endpoints;
@@ -92,5 +95,69 @@ public static class UserEndpoints
             );
         });
 
+
+
+        app.MapPost("/api/auth/login", async (LoginRequest body, NpgsqlDataSource db) =>
+        {
+            try
+            {
+                if (body is null || body.UserId == Guid.Empty)
+                {
+                    return Results.BadRequest(new { error = "UserId is required." });
+                }
+
+                if (string.IsNullOrWhiteSpace(body.Passcode))
+                {
+                    return Results.BadRequest(new { error = "Passcode is required." });
+                }
+
+                const string sql = @"
+            select passcode_hash
+            from app_users          
+            where user_id = @user_id  
+            limit 1;
+        ";
+
+                await using var cmd = db.CreateCommand(sql);
+                cmd.Parameters.AddWithValue("user_id", body.UserId);
+
+                var dbHashObj = await cmd.ExecuteScalarAsync();
+                var storedHash = dbHashObj as string;
+
+                if (storedHash is null)
+                {
+                    return Results.Json(
+                        new { success = false, error = "Invalid user or passcode." },
+                        statusCode: StatusCodes.Status401Unauthorized
+                    );
+                }
+
+                var ok = VerifyPasscode(body.Passcode, storedHash);
+                if (!ok)
+                {
+                    return Results.Json(
+                        new { success = false, error = "Invalid user or passcode." },
+                        statusCode: StatusCodes.Status401Unauthorized
+                    );
+                }
+
+                return Results.Ok(new { success = true });
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Error in POST /api/auth/login:");
+                Console.Error.WriteLine(ex);  /* this prints the REAL reason */
+
+                return Results.Problem("Login failed due to server error.", statusCode: 500);
+            }
+        });
+
+
+
+    }
+
+    static bool VerifyPasscode(string passcode, string storedHash)
+    {
+        return BCrypt.Net.BCrypt.Verify(passcode, storedHash);
     }
 }

@@ -3,16 +3,16 @@
   "WorkspaceRootPath": "C:\\Projects\\RestaurantSys\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|c:\\projects\\restaurantsys\\backend\\integrations\\restaurantsys.managementapi\\restaurantsys.managementapi.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
-      "RelativeMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|solutionrelative:backend\\integrations\\restaurantsys.managementapi\\restaurantsys.managementapi.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|c:\\projects\\restaurantsys\\backend\\integrations\\restaurantsys.managementapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|solutionrelative:backend\\integrations\\restaurantsys.managementapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|c:\\projects\\restaurantsys\\backend\\integrations\\restaurantsys.managementapi\\dockerfile||{3B902123-F8A7-4915-9F01-361F908088D0}",
       "RelativeMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|solutionrelative:backend\\integrations\\restaurantsys.managementapi\\dockerfile||{3B902123-F8A7-4915-9F01-361F908088D0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|c:\\projects\\restaurantsys\\backend\\integrations\\restaurantsys.managementapi\\restaurantsys.managementapi.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|solutionrelative:backend\\integrations\\restaurantsys.managementapi\\restaurantsys.managementapi.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
     },
     {
       "AbsoluteMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|c:\\projects\\restaurantsys\\backend\\integrations\\restaurantsys.managementapi\\properties\\launchsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
@@ -62,7 +62,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 1,
+          "SelectedChildIndex": 5,
           "Children": [
             {
               "$type": "Bookmark",
@@ -70,20 +70,20 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
               "Title": "RestaurantSys.ManagementApi",
               "DocumentMoniker": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj",
               "RelativeDocumentMoniker": "backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj",
               "ToolTip": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj",
               "RelativeToolTip": "backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAABCAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
               "WhenOpened": "2025-11-20T13:16:24.199Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 1,
               "Title": "dockerfile",
               "DocumentMoniker": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\dockerfile",
               "RelativeDocumentMoniker": "backend\\integrations\\RestaurantSys.ManagementApi\\dockerfile",
@@ -122,13 +122,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 0,
               "Title": "Program.cs",
               "DocumentMoniker": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\Program.cs",
               "RelativeDocumentMoniker": "backend\\integrations\\RestaurantSys.ManagementApi\\Program.cs",
               "ToolTip": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\Program.cs",
               "RelativeToolTip": "backend\\integrations\\RestaurantSys.ManagementApi\\Program.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAtAAAAAAAAAA==",
+              "ViewState": "AgIAAFcAAAAAAAAAAAAAAAgAAAAyAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-11-17T11:30:51.811Z",
               "EditorCaption": ""

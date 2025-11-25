@@ -229,7 +229,7 @@ namespace RestaurantSys.Api
     public sealed class LoginRequest
     {
         public Guid UserId { get; set; }
-        public string Passcode { get; set; }
-
+        public string Passcode { get; set; } = string.Empty;
     }
+
 }
