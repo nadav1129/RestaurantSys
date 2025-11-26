@@ -25,6 +25,7 @@
 <ItemGroup>
   <Folder Include="Floor\" />
   <Folder Include="Hostess\" />
+  <Folder Include="src\Checker\" />
 </ItemGroup>
 
 

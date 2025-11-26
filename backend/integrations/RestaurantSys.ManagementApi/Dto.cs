@@ -232,4 +232,66 @@ namespace RestaurantSys.Api
         public string Passcode { get; set; } = string.Empty;
     }
 
+    public sealed class WorkerDto
+    {
+        [JsonPropertyName("workerId")]
+        public Guid WorkerId { get; set; }
+
+        [JsonPropertyName("firstName")]
+        public string FirstName { get; set; } = string.Empty;
+
+        [JsonPropertyName("lastName")]
+        public string LastName { get; set; } = string.Empty;
+
+        [JsonPropertyName("personalId")]
+        public string? PersonalId { get; set; }
+
+        [JsonPropertyName("email")]
+        public string? Email { get; set; }
+
+        [JsonPropertyName("phone")]
+        public string? Phone { get; set; }
+
+        [JsonPropertyName("position")]
+        public string Position { get; set; } = string.Empty;
+
+        [JsonPropertyName("salaryCents")]
+        public int? SalaryCents { get; set; }
+
+        [JsonPropertyName("createdAt")]
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public sealed class CreateWorkerRequest
+    {
+        [JsonPropertyName("firstName")]
+        public string? FirstName { get; set; }
+
+        [JsonPropertyName("lastName")]
+        public string? LastName { get; set; }
+
+        [JsonPropertyName("position")]
+        public string? Position { get; set; }
+
+        [JsonPropertyName("personalId")]
+        public string? PersonalId { get; set; }
+
+        [JsonPropertyName("email")]
+        public string? Email { get; set; }
+
+        [JsonPropertyName("phone")]
+        public string? Phone { get; set; }
+
+        [JsonPropertyName("salaryCents")]
+        public int? SalaryCents { get; set; }
+    }
+
+    public sealed class CreateWorkerResponse
+    {
+        [JsonPropertyName("worker")]
+        public WorkerDto Worker { get; set; } = default!;
+
+        [JsonPropertyName("loginCode")]
+        public string LoginCode { get; set; } = string.Empty;
+    }
 }
