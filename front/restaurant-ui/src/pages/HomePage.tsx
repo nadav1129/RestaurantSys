@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Button from "../components/Button";
+import { apiFetch } from "../api/api";
 
 type DeviceMode = "fixed" | "personal";
 
@@ -9,10 +10,27 @@ type Station = {
   type: string;
 };
 
-type Worker = {
-  id: string;
+type AppUser = {
+  userId: string;
+  workerId: string;
   name: string;
   role?: string;
+};
+
+type Worker = {
+  id: string;        // userId
+  workerId: string;  // FK to workers table
+  name: string;
+  role?: string;
+};
+
+type ShiftDto = {
+  shiftId: string;
+  name: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  status: "planned" | "active" | "closed" | "cancelled" | string;
+  createdAt: string;
 };
 
 type Props = {
@@ -31,9 +49,9 @@ const DEMO_STATIONS: Station[] = [
 ];
 
 const DEMO_WORKERS: Worker[] = [
-  { id: "w-1", name: "Nadav", role: "Bartender" },
-  { id: "w-2", name: "Dana", role: "Floor" },
-  { id: "w-3", name: "Yossi", role: "Kitchen" },
+  { id: "demo-u1", workerId: "demo-w1", name: "LIST", role: "Bartender" },
+  { id: "demo-u2", workerId: "demo-w2", name: "DIDNT", role: "Floor" },
+  { id: "demo-u3", workerId: "demo-w3", name: "LOAD", role: "Kitchen" },
 ];
 
 export default function HomePage({
@@ -58,8 +76,57 @@ export default function HomePage({
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   const [pinInput, setPinInput] = useState("");
 
+  const [appUsers, setAppUsers] = useState<AppUser[]>([]);
+  const [activeShift, setActiveShift] = useState<ShiftDto | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load app_users + active shift on mount
+  useEffect(() => {
+    void loadInitial();
+  }, []);
+
+  async function loadInitial() {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [usersResp, shiftResp] = await Promise.all([
+        apiFetch("/api/auth/users"),       // list of app_users
+        apiFetch("/api/shifts/active"),    // current active shift
+      ]);
+
+      setAppUsers(Array.isArray(usersResp) ? (usersResp as AppUser[]) : []);
+      setActiveShift((shiftResp as ShiftDto | null) ?? null);
+    } catch (err) {
+      console.error("Failed to load users / shift", err);
+      setError("Failed to load staff or shift info.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Map app_users -> Worker objects for UI
+  const workersFromUsers: Worker[] = useMemo(
+    () =>
+      appUsers.map((u) => ({
+        id: u.userId,
+        workerId: u.workerId,
+        name: u.name,
+        role: u.role,
+      })),
+    [appUsers]
+  );
+
   const allStations = stations && stations.length > 0 ? stations : DEMO_STATIONS;
-  const allWorkers = workers && workers.length > 0 ? workers : DEMO_WORKERS;
+
+  const allWorkers =
+    workers && workers.length > 0
+      ? workers
+      : workersFromUsers.length > 0
+      ? workersFromUsers
+      : DEMO_WORKERS;
 
   const selectedStation = useMemo(
     () => allStations.find((s) => s.id === selectedStationId) ?? allStations[0],
@@ -80,42 +147,82 @@ export default function HomePage({
   const defaultBrief =
     "Tonight we expect a busy shift. Focus on fast service, upsell when possible, and keep an eye on large groups. Any issues, contact management.";
 
-  function handleConfirmShift() {
-    if (!selectedWorker || pinInput.trim().length === 0) {
-      // simple guard for now
-      return;
-    }
+  function isGuid(v: string | null | undefined) {
+  return typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+}
 
-    // Simulation log for now
-    console.log(
-      `${shiftPanelMode === "start" ? "Start" : "End"} shift for ${
-        selectedWorker.name
-      }`,
-      {
-        deviceMode,
-        station: selectedStation,
-        pin: pinInput,
-      }
+async function handleConfirmShift() {
+  if (!selectedWorker || pinInput.trim().length === 0) return;
+
+  if (!activeShift || activeShift.status !== "active") {
+    setError("No active shift. Ask manager to start a shift on the Dashboard.");
+    return;
+  }
+
+  // Guard: make sure we actually have a real workerId (GUID)
+  if (!isGuid(selectedWorker.workerId)) {
+    setError(
+      "Selected user has no linked workerId. Make sure /api/auth/users returns workerId (GUID) for each user."
     );
+    return;
+  }
+
+  try {
+    setBusy(true);
+    setError(null);
+
+    // 1) verify PIN
+    await apiFetch("/api/auth/login", {
+      method: "POST",
+      body: { userId: selectedWorker.id, passcode: pinInput.trim() },
+    });
+
+    // 2) clock in/out using the *workerId* (GUID)
+    const workerId = selectedWorker.workerId!;
+    const shiftId = activeShift.shiftId;
 
     if (shiftPanelMode === "start") {
+      await apiFetch(`/api/shifts/${shiftId}/workers/clock-in`, {
+        method: "POST",
+        body: {
+          workerId, // must be a GUID
+          // stationId can be omitted if your stations are demo strings
+          stationId:
+            deviceMode === "fixed" && isGuid(selectedStation?.id)
+              ? (selectedStation!.id as string)
+              : undefined,
+          deviceType: deviceMode, // "fixed" | "personal"
+        },
+      });
       onStart?.();
-    } else if (shiftPanelMode === "end") {
+    } else {
+      await apiFetch(`/api/shifts/${shiftId}/workers/clock-out`, {
+        method: "POST",
+        body: { workerId },
+      });
       onEnd?.();
     }
 
-    // reset panel state
+    // reset
     setShiftPanelMode(null);
     setSearchWorker("");
     setSelectedWorkerId(null);
     setPinInput("");
+  } catch (err) {
+    console.error("Shift action failed", err);
+    setError("Failed to update shift. Check PIN or ask manager.");
+  } finally {
+    setBusy(false);
   }
+}
+
 
   function handleCancelShift() {
     setShiftPanelMode(null);
     setSearchWorker("");
     setSelectedWorkerId(null);
     setPinInput("");
+    setError(null);
   }
 
   return (
@@ -124,6 +231,17 @@ export default function HomePage({
       <h2 className="text-2xl font-semibold tracking-tight">
         {title ?? "Home"}
       </h2>
+
+      {loading && (
+        <div className="text-xs text-gray-500">
+          Loading staff / shift info…
+        </div>
+      )}
+      {error && (
+        <div className="text-xs text-red-600">
+          {error}
+        </div>
+      )}
 
       {/* 1. Top: Device info + switch button (simulate tablet type) */}
       <section className="rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
@@ -275,6 +393,7 @@ export default function HomePage({
                   setSearchWorker("");
                   setSelectedWorkerId(null);
                   setPinInput("");
+                  setError(null);
                 }}
               >
                 Start Shift
@@ -287,6 +406,7 @@ export default function HomePage({
                   setSearchWorker("");
                   setSelectedWorkerId(null);
                   setPinInput("");
+                  setError(null);
                 }}
               >
                 End Shift
@@ -408,13 +528,19 @@ export default function HomePage({
                   type="button"
                   variant="primary"
                   onClick={handleConfirmShift}
-                  disabled={!selectedWorker || pinInput.trim().length === 0}
+                  disabled={
+                    busy || !selectedWorker || pinInput.trim().length === 0
+                  }
                 >
-                  Confirm {shiftPanelMode === "start" ? "Start" : "End"} Shift
+                  {busy
+                    ? "Working…"
+                    : `Confirm ${
+                        shiftPanelMode === "start" ? "Start" : "End"
+                      } Shift`}
                 </Button>
                 <div className="text-[11px] text-gray-500">
-                  PIN validation and real shift logic will be connected to the
-                  backend later.
+                  PIN is validated against the user&apos;s personal code, then
+                  we clock them in/out in the active shift.
                 </div>
               </div>
             </div>

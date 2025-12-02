@@ -28,7 +28,11 @@ export default function App() {
       case "home":
         return <HomePage />;
       case "login":
-        return <LoginPage />;
+        return (
+        <LoginPage
+          onBackToUserLogin={() => setPage("home")}
+        />
+      );
       case "actions":
         return <ActionsPage />;
       case "service":

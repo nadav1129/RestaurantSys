@@ -79,8 +79,10 @@ public static class OrderEndpoints
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine("Error in GET /api/shifts/{shiftId}/orders:\n" + ex);
-                return Results.Problem("GET /api/shifts/{shiftId}/orders failed", statusCode: 500);
+                Console.Error.WriteLine("Error in GET /api/shifts/{shiftId}/orders");
+                Console.Error.WriteLine(ex);
+
+                return Results.Problem("Fetching shift failed.", statusCode: 500);
             }
         });
 

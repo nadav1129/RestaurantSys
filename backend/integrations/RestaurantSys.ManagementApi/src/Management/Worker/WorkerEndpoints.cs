@@ -167,10 +167,44 @@ public static class WorkerEndpoints
                 await using var tx = await conn.BeginTransactionAsync();
 
                 /* 1) Insert worker */
+                var rnd = new Random();
+                var staffCode = rnd.Next(0, 10000).ToString("D4");
+
                 const string insertWorkerSql = @"
-                    insert into workers (first_name, last_name, personal_id, email, phone, position, salary_cents)
-                    values (@first_name, @last_name, @personal_id, @email, @phone, @position, @salary_cents)
-                    returning worker_id, first_name, last_name, personal_id, email, phone, position, salary_cents, created_at;";
+    insert into workers (
+        first_name,
+        last_name,
+        personal_id,
+        email,
+        phone,
+        position,
+        salary_cents,
+        staff_code
+    )
+    values (
+        @first_name,
+        @last_name,
+        @personal_id,
+        @email,
+        @phone,
+        @position,
+        @salary_cents,
+        @staff_code
+    )
+    returning worker_id,
+              first_name,
+              last_name,
+              personal_id,
+              email,
+              phone,
+              position,
+              salary_cents,
+              created_at;
+";
+
+
+
+
 
                 await using var cmd = new NpgsqlCommand(insertWorkerSql, conn, tx);
                 cmd.Parameters.AddWithValue("first_name", firstName);
@@ -180,6 +214,7 @@ public static class WorkerEndpoints
                 cmd.Parameters.AddWithValue("phone", (object?)phone ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("position", position);
                 cmd.Parameters.AddWithValue("salary_cents", (object?)salaryCents ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("staff_code", staffCode);
 
                 await using var reader = await cmd.ExecuteReaderAsync();
                 if (!await reader.ReadAsync())
@@ -201,31 +236,12 @@ public static class WorkerEndpoints
                     CreatedAt = reader.GetDateTime(8)
                 };
                 await reader.DisposeAsync();
-
-                /* 2) Generate unique 4-digit login code */
-                string loginCode = await GenerateUniqueLoginCodeAsync(conn, tx);
-
-                /* 3) Insert app_user for this worker
-                   NOTE: requires app_users(worker_id, login_code, passcode_hash, role, name) columns. */
-                const string insertUserSql = @"
-                    insert into app_users (worker_id, name, role, login_code, passcode_hash)
-                    values (@worker_id, @name, @role, @login_code, @passcode_hash);";
-
-                await using var cmdUser = new NpgsqlCommand(insertUserSql, conn, tx);
-                cmdUser.Parameters.AddWithValue("worker_id", worker.WorkerId);
-                cmdUser.Parameters.AddWithValue("name", $"{worker.FirstName} {worker.LastName}");
-                cmdUser.Parameters.AddWithValue("role", "user");
-                cmdUser.Parameters.AddWithValue("login_code", loginCode);
-                cmdUser.Parameters.AddWithValue("passcode_hash", string.Empty); /* TODO: real hash */
-
-                await cmdUser.ExecuteNonQueryAsync();
-
                 await tx.CommitAsync();
 
                 var response = new
                 {
                     worker,
-                    loginCode
+                    loginCode = staffCode
                 };
 
                 return Results.Json(
@@ -274,31 +290,5 @@ public static class WorkerEndpoints
                 return Results.Problem("DELETE /api/workers/{workerId} failed", statusCode: 500);
             }
         });
-    }
-
-    /* local helper for POST /api/workers */
-    private static async Task<string> GenerateUniqueLoginCodeAsync(
-        NpgsqlConnection conn,
-        NpgsqlTransaction tx)
-    {
-        var rnd = new Random();
-
-        for (int attempt = 0; attempt < 20; attempt++)
-        {
-            var code = rnd.Next(0, 10000).ToString("D4");
-
-            const string checkSql = @"select 1 from app_users where login_code = @code limit 1;";
-            await using var checkCmd = new NpgsqlCommand(checkSql, conn, tx);
-            checkCmd.Parameters.AddWithValue("code", code);
-
-            var exists = await checkCmd.ExecuteScalarAsync();
-            if (exists is null)
-            {
-                return code;
-            }
-        }
-
-        // extreme fallback – should basically never happen
-        return "0000";
     }
 }

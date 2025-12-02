@@ -228,6 +228,8 @@ CREATE TABLE IF NOT EXISTS workers (
   /* Salary in cents (so 10,000.00₪ = 1,000,000) */
   salary_cents  int,
 
+  staff_code    text,
+
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 
@@ -247,11 +249,6 @@ CREATE TABLE IF NOT EXISTS app_users (
 /* One login per worker */
 CREATE UNIQUE INDEX IF NOT EXISTS ux_app_users_worker
   ON app_users (worker_id);
-
-
-/* Optional: prevent two users with same name (case-insensitive) */
-CREATE UNIQUE INDEX IF NOT EXISTS ux_app_users_name_ci
-  ON app_users (lower(name));
 
 
 /* ===== Shifts ===== */

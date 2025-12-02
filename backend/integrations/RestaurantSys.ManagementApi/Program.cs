@@ -1,13 +1,14 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
 using Npgsql;
 using RestaurantSys.Api;
 using RestaurantSys.Api.Endpoints;
+using RestaurantSys.ManagementApi.Diagnostics;
 using RestaurantSys.ManagementApi.Management.Menu;
 using System.Data;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -54,6 +55,10 @@ builder.Services.AddSingleton(dataSource);
 // very open CORS for local dev
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.AllowAnyHeader().AllowAnyMethod().AllowCredentials().SetIsOriginAllowed(_ => true)));
+
+// register tests
+builder.Services.AddSingleton<ITestCase, DbBasicQueryTest>();
+builder.Services.AddSingleton<TestRegistry>();
 
 var app = builder.Build();
 app.UseCors();
@@ -115,23 +120,43 @@ else
         throw;
     }
 }
-// register all routes from ManagementApi.cs
+
+/* ============ Route register ============ */
+// Menu
 app.MapMenusEndpoints();
 app.MapMenuNodesEndpoints();
 app.MapIngredientsEndpoints();
 app.MapProductsEndpoints();
 app.MapPricesEndpoints();
-app.MapSpeedMapEndpoints();
+//app.MapSpeedMapEndpoints();
+
+// Menagement
 app.MapSettingsEndpoints();
-app.MapStationsEndpoints();
-app.MapListEndpoints();
 app.MapListStationsEndpoints();
 app.MapTableStationsEndpoints();
+
+//Stations
+app.MapStationsEndpoints();
+app.MapListEndpoints();
+
+// Shifts
+app.MapShiftEndpoints();
+app.MapShiftWorkersEndpoints(); 
+
+// Orders
+app.MapOrderEndpoints();
+app.MapOrderRouteEndpoints();
+
+// User
+app.MapWorkerEndpoints();
 app.MapUserEndpoints();
 
-//JWT
+// JWT
 app.UseAuthentication();
 app.UseAuthorization();
+
+// TESTS
+app.MapDevTestsEndpoints();
 
 // minimal health
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));

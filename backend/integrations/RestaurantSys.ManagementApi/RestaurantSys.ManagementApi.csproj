@@ -7,6 +7,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Floor\**" />
+    <Compile Remove="Hostess\**" />
+    <Content Remove="Floor\**" />
+    <Content Remove="Hostess\**" />
+    <EmbeddedResource Remove="Floor\**" />
+    <EmbeddedResource Remove="Hostess\**" />
+    <None Remove="Floor\**" />
+    <None Remove="Hostess\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="dbup-core" Version="6.0.4" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
@@ -23,8 +34,6 @@
 </ItemGroup>
 
 <ItemGroup>
-  <Folder Include="Floor\" />
-  <Folder Include="Hostess\" />
   <Folder Include="src\Checker\" />
 </ItemGroup>
 

@@ -56,7 +56,7 @@ public static class ProductsEndpoints
           p.product_id,
           p.name,
           p.type,
-          pr.price           -- <- ensure this is the actual column name
+          pr.price          
         from product_menu_nodes pmn
         join products    p  on p.product_id = pmn.product_id
         join menu_nodes  mn on mn.node_id   = pmn.menu_node_id
@@ -208,7 +208,7 @@ public static class ProductsEndpoints
                        pCmd.Parameters.Add("@name", NpgsqlTypes.NpgsqlDbType.Text).Value = name;
 
                        // Constant type for all products (change the string if you prefer "Bottle" etc.)
-                       pCmd.Parameters.Add("@type", NpgsqlTypes.NpgsqlDbType.Text).Value = "Cocktail";
+                       pCmd.Parameters.Add("@type", NpgsqlTypes.NpgsqlDbType.Text).Value = body.Type;
 
                        pCmd.Parameters.Add("@sold", NpgsqlTypes.NpgsqlDbType.Boolean).Value = body.SoldAsBottleOnly;
 
@@ -272,7 +272,7 @@ public static class ProductsEndpoints
            });
 
 
-        // DELETE link: /api/menu-nodes/{nodeId}/products/{productId}
+        // Delete link between menu and product
         app.MapDelete("/api/menu-nodes/{nodeId:guid}/products/{productId:guid}", async (Guid nodeId, Guid productId, NpgsqlDataSource db) =>
         {
             try

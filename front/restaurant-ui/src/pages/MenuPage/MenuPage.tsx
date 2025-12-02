@@ -121,7 +121,7 @@ export default function MenuPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   name: p.name,
-                  type: p.isBottleOnly ? "Bottle" : "Cocktail",
+                  type: p.isBottleOnly? "bottle" : p.productType,
                   soldAsBottleOnly: !!p.isBottleOnly,
                   menuNodeId: null,
                   components: p.lines.map((l) => ({

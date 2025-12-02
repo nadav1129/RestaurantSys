@@ -1,17 +1,119 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { apiFetch } from "../../api/api";
 
 type DashboardTab = "alerts" | "tables" | "orders" | "staff";
 
-export interface DashboardPageProps {
-  hasActiveShift: boolean;
-  onStartShift: () => void;
-}
+type ShiftDto = {
+  shiftId: string;
+  name: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  status: "planned" | "active" | "closed" | "cancelled" | string;
+  createdAt: string;
+};
 
-export default function DashboardPage({
-  hasActiveShift,
-  onStartShift,
-}: DashboardPageProps) {
+export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<DashboardTab>("alerts");
+
+  const [activeShift, setActiveShift] = useState<ShiftDto | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [elapsedText, setElapsedText] = useState<string>("00:00");
+
+  // Load current active shift on mount
+  useEffect(() => {
+    void loadActiveShift();
+  }, []);
+
+  async function loadActiveShift() {
+    try {
+      setLoading(true);
+      setError(null);
+      const shift = (await apiFetch("/api/shifts/active")) as ShiftDto | null;
+      setActiveShift(shift ?? null);
+    } catch (err) {
+      console.error("Failed to load active shift", err);
+      setError("Failed to load active shift.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Compute elapsed time from startedAt
+  useEffect(() => {
+    if (!activeShift || !activeShift.startedAt || activeShift.status !== "active") {
+      setElapsedText("00:00");
+      return;
+    }
+
+    const startMs = new Date(activeShift.startedAt).getTime();
+
+    const update = () => {
+      const now = Date.now();
+      let diff = now - startMs;
+      if (diff < 0) diff = 0;
+
+      const totalSeconds = Math.floor(diff / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      const h = hours.toString().padStart(2, "0");
+      const m = minutes.toString().padStart(2, "0");
+      const s = seconds.toString().padStart(2, "0");
+
+      setElapsedText(hours > 0 ? `${h}:${m}:${s}` : `${m}:${s}`);
+    };
+
+    update(); // set initial
+    const id = window.setInterval(update, 1000);
+
+    return () => window.clearInterval(id);
+  }, [activeShift?.shiftId, activeShift?.startedAt, activeShift?.status]);
+
+  async function handleStartShift() {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const created = (await apiFetch("/api/shifts", {
+        method: "POST",
+        body: JSON.stringify({ name: null }), // optional shift name, you can change later
+      })) as ShiftDto;
+
+      setActiveShift(created);
+    } catch (err) {
+      console.error("Failed to start shift", err);
+      setError("Failed to start shift.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleEndShift() {
+    if (!activeShift) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      await apiFetch(`/api/shifts/${activeShift.shiftId}/close`, {
+        method: "POST",
+      });
+
+      // After closing we treat it as "no active shift"
+      setActiveShift(null);
+    } catch (err) {
+      console.error("Failed to end shift", err);
+      setError("Failed to end shift.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const hasActiveShift =
+    !!activeShift && activeShift.status === "active" && !activeShift.endedAt;
 
   /* If no active shift, show guard screen */
   if (!hasActiveShift) {
@@ -29,11 +131,18 @@ export default function DashboardPage({
             start a shift.
           </p>
 
+          {error && (
+            <div className="mt-2 text-xs text-red-600">
+              {error}
+            </div>
+          )}
+
           <button
-            onClick={onStartShift}
-            className="mt-4 w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-black"
+            onClick={handleStartShift}
+            disabled={loading}
+            className="mt-4 w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-black disabled:opacity-60"
           >
-            Start Shift
+            {loading ? "Starting…" : "Start Shift"}
           </button>
         </div>
       </div>
@@ -43,9 +152,9 @@ export default function DashboardPage({
   /* When there is an active shift, show full dashboard layout */
   return (
     <div className="flex min-h-[calc(100vh-4rem)] flex-col gap-4">
-      {/* Top: Analytics header (reserved for later graphs) */}
+      {/* Top: Analytics header + shift info */}
       <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
               Dashboard
@@ -54,18 +163,43 @@ export default function DashboardPage({
               Current Shift Overview
             </div>
             <div className="mt-1 text-xs text-gray-500">
-              Today vs. typical day, live numbers and trends.
+              Shift started at{" "}
+              {activeShift?.startedAt
+                ? new Date(activeShift.startedAt).toLocaleTimeString()
+                : "—"}
+              {" • "}
+              Time on shift: <span className="font-semibold">{elapsedText}</span>
             </div>
+            {activeShift?.name && (
+              <div className="mt-0.5 text-xs text-gray-500">
+                Name: {activeShift.name}
+              </div>
+            )}
           </div>
 
-          {/* Placeholder: later we can add filters / date pickers */}
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span className="rounded-full border border-gray-200 px-2 py-1">
-              Today
-            </span>
-            <span className="rounded-full border border-gray-200 px-2 py-1">
-              Current Shift
-            </span>
+          <div className="flex flex-col items-end gap-2 text-xs text-gray-500">
+            {/* Filters placeholder */}
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-gray-200 px-2 py-1">
+                Today
+              </span>
+              <span className="rounded-full border border-gray-200 px-2 py-1">
+                Current Shift
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleEndShift}
+              disabled={loading}
+              className="rounded-xl border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
+            >
+              {loading ? "Ending…" : "End Shift"}
+            </button>
+
+            {error && (
+              <div className="mt-1 text-[11px] text-red-600">{error}</div>
+            )}
           </div>
         </div>
 
@@ -170,7 +304,7 @@ function DashboardTabButton(props: {
   );
 }
 
-/* Placeholder tab contents – we will implement these properly soon */
+/* Placeholder tab contents – unchanged */
 
 function AlertsTab() {
   return (
