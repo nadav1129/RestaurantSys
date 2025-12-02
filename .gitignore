@@ -37,3 +37,5 @@ logs/
 *.v2
 .vs/RestaurantSys/DesignTimeBuild/.dtbcache.v2
 .vs/RestaurantSys/FileContentIndex/754e1981-e8ad-4bd1-b6b3-4341dd9774b8.vsidx
+.vs/RestaurantSys/CopilotIndices/17.14.670.39694/CodeChunks.db
+.vs/RestaurantSys/CopilotIndices/17.14.670.39694/SemanticSymbols.db
