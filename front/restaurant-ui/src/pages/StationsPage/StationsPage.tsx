@@ -18,6 +18,7 @@ type OpenMap = Record<string, boolean>;
 type SelectMap = Record<string, boolean>;
 
 /* Choose which card to render per station TYPE */
+/* Choose which card to render per station TYPE */
 function StationCardRouter({ row }: { row: StationRow }) {
   const t = row.type;
   if (t === "Bar" || t === "Floor") {
@@ -39,6 +40,20 @@ function StationCardRouter({ row }: { row: StationRow }) {
     );
   }
 
+  // NEW: Checker station – no extra editor, just a simple card
+  if (t === "Checker") {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
+        <div className="mb-1 text-sm font-medium">
+          Checker · {row.name}
+        </div>
+        <div className="text-xs text-gray-500">
+          No configuration needed. This station uses the Checker page to manage food orders.
+        </div>
+      </div>
+    );
+  }
+
   // Placeholder for types not yet implemented
   return (
     <div className="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-600">
@@ -51,6 +66,7 @@ function StationCardRouter({ row }: { row: StationRow }) {
     </div>
   );
 }
+
 
 export default function StationsPage() {
   const [rows, setRows] = useState<StationRow[]>([]);

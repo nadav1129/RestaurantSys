@@ -28,7 +28,7 @@ type CartItem = {
   id: string; // product id
   name: string;
   qty: number;
-  price: number; /* unit price actually charged */
+  price: number /* unit price actually charged */;
   additions: string[];
   notes?: string;
 };
@@ -43,6 +43,14 @@ type ApiNode = {
   name: string;
   isLeaf: boolean; // may not be trustworthy; we still infer from children
   children?: ApiNode[];
+};
+
+type ShiftDto = {
+  shiftId: string;
+  status: "planned" | "active" | "closed" | "cancelled" | string;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  name?: string | null;
 };
 
 /* =========================
@@ -72,6 +80,42 @@ function arrayEq(a: string[], b: string[]) {
   const sa = [...a].sort();
   const sb = [...b].sort();
   return sa.every((x, i) => x === sb[i]);
+}
+
+// Compose a draft payload once
+function buildOrderDraft({
+  table,
+  guestName,
+  phone,
+  diners,
+  note,
+  cart,
+}: {
+  table: string;
+  guestName: string;
+  phone: string;
+  diners: string;
+  note: string;
+  cart: CartItem[];
+}) {
+  return {
+    table: table || "none",
+    guestName: guestName || null,
+    guestPhone: phone || null,
+    dinersCount: diners ? Number(diners) || null : null,
+    note: note || null,
+    items: cart.map((c) => ({
+      productId: c.id,
+      name: c.name,
+      qty: c.qty,
+      unitPrice: c.price,
+      additions: c.additions,
+      notes: c.notes ?? null,
+      lineTotal: c.qty * c.price,
+    })),
+    // future: station hints for routing, eg: "checker" | "bar"
+    stations: ["checker", "bar"],
+  };
 }
 
 /* =========================
@@ -104,7 +148,9 @@ export default function OrderPage() {
 
   // View mode: browsing products vs customizing a product
   const [mode, setMode] = useState<"browse" | "customize">("browse");
-  const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(
+    null
+  );
 
   // Customization state
   const [customQty, setCustomQty] = useState<number>(1);
@@ -116,6 +162,21 @@ export default function OrderPage() {
 
   // Cache of nodeId -> products so re-entering a category restores its products instantly
   const productCacheRef = useRef<Map<string, ProductItem[]>>(new Map());
+  const [activeShift, setActiveShift] = useState<ShiftDto | null>(null);
+  const [shiftError, setShiftError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setShiftError(null);
+        const s = await apiFetch<ShiftDto | null>("/api/shifts/active");
+        setActiveShift(s ?? null);
+      } catch (e) {
+        console.error("Failed to load active shift", e);
+        setShiftError("No active shift. Start one in Dashboard.");
+      }
+    })();
+  }, []);
 
   // Reset confirmation when cart is cleared
   useEffect(() => {
@@ -135,7 +196,8 @@ export default function OrderPage() {
         // 1) read current settings (active menu + discount)
         const s = (await apiFetch("/api/settings")) as SettingsDto;
         const active = s?.activeMenuNum ?? null;
-        const disc = typeof s?.globalDiscountPct === "number" ? s.globalDiscountPct : 0;
+        const disc =
+          typeof s?.globalDiscountPct === "number" ? s.globalDiscountPct : 0;
 
         if (active == null) {
           if (!cancelled) {
@@ -148,7 +210,9 @@ export default function OrderPage() {
         }
 
         // 2) load the tree: backend returns children[] of root
-        const arr = (await apiFetch(`/api/menu-nodes?menu=${active}`)) as ApiNode[];
+        const arr = (await apiFetch(
+          `/api/menu-nodes?menu=${active}`
+        )) as ApiNode[];
 
         // Wrap server's children[] into a fake root
         const fakeRoot: MenuNode = {
@@ -203,7 +267,12 @@ export default function OrderPage() {
       try {
         const arr = (await apiFetch(
           `/api/menu-nodes/${current.id}/products`
-        )) as Array<{ id: string; name: string; type: string; price: number | null }>;
+        )) as Array<{
+          id: string;
+          name: string;
+          type: string;
+          price: number | null;
+        }>;
 
         // Map backend cents -> UI shekels (remove /100 if already in shekels)
         const mapped: ProductItem[] = (arr ?? []).map((x) => ({
@@ -289,7 +358,10 @@ export default function OrderPage() {
 
     setCart((prev) => {
       const i = prev.findIndex(
-        (c) => c.id === id && c.notes === customNotes && arrayEq(c.additions, additions)
+        (c) =>
+          c.id === id &&
+          c.notes === customNotes &&
+          arrayEq(c.additions, additions)
       );
       if (i >= 0) {
         const next = prev.slice();
@@ -298,7 +370,14 @@ export default function OrderPage() {
       }
       return [
         ...prev,
-        { id, name, qty: customQty, price: unitPrice, additions, notes: customNotes },
+        {
+          id,
+          name,
+          qty: customQty,
+          price: unitPrice,
+          additions,
+          notes: customNotes,
+        },
       ];
     });
 
@@ -309,20 +388,65 @@ export default function OrderPage() {
   const removeCartItem = (index: number) =>
     setCart((prev) => prev.filter((_, i) => i !== index));
 
-  const handleTopButtonClick = () => {
-    if (cart.length === 0) return;
+  const handleTopButtonClick = async () => {
+  if (cart.length === 0) return;
 
-    if (!orderConfirmed) {
-      setOrderConfirmed(true);
-      return;
+  if (!orderConfirmed) {
+    setOrderConfirmed(true);
+    return;
+  }
+
+  // must have active shift
+  if (!activeShift || activeShift.status !== "active") {
+    alert("No active shift. Start a shift in Dashboard first.");
+    return;
+  }
+
+  try {
+    const body = {
+      shiftId: activeShift.shiftId,  // ✅ now a GUID
+      tableId: null,
+      openedByWorkerId: null,
+      source: "table",
+      guestName: guestName || null,
+      guestPhone: phone || null,
+      dinersCount: diners ? Number(diners) || null : null,
+      note: note || null,
+      minSpendCents: null
+    };
+
+    const created = await apiFetch("/api/orders", {
+      method: "POST",
+      body
+    });
+
+      // (Optional) You can also PATCH with totals once you compute them server-side.
+      // await apiFetch(`/api/orders/${created.orderId}`, {
+      //   method: "PATCH",
+      //   body: {
+      //     totalBeforeTipCents: Math.round(total * 100),
+      //     tipCents: Math.round(total * 10), // if you want to persist 10% here
+      //     totalCents: Math.round(totalWith10 * 100),
+      //     paymentStatus: "paid",
+      //     status: "closed"
+      //   }
+      // });
+
+      // local UI close-out
+      const now = new Date();
+      setEndTime(now);
+      alert(`Paid ₪${totalWith10} (Total ₪${total}, Tip ₪${only10})`);
+
+      // clear cart & reset
+      setCart([]);
+      setOrderConfirmed(false);
+      setGuestName("");
+      setPhone("");
+      setDiners("");
+      setNote("");
+    } catch (e: any) {
+      alert(e?.message || "Failed to save order.");
     }
-
-    // Pay now
-    const now = new Date();
-    setEndTime(now);
-    alert(
-      `Pay ₪${totalWith10} for table ${table} (Total: ₪${total}, Tip (10%): ₪${only10})`
-    );
   };
 
   /* =========================
@@ -363,8 +487,29 @@ export default function OrderPage() {
               variant={orderConfirmed ? "secondary" : "primary"}
               className="text-xs"
               disabled={cart.length === 0 || orderConfirmed}
-              onClick={() => {
+              onClick={async () => {
                 if (cart.length === 0) return;
+
+                // 1) send draft to router sink (no-op on server for now)
+                try {
+                  const draft = buildOrderDraft({
+                    table,
+                    guestName,
+                    phone,
+                    diners,
+                    note,
+                    cart,
+                  });
+                  await apiFetch("/api/orders/route", {
+                    method: "POST",
+                    body: draft,
+                  });
+                } catch (e) {
+                  // non-fatal for now; you can show a toast if you want
+                  console.warn("route sink failed (ignored for now)", e);
+                }
+
+                // 2) lock UI as confirmed
                 setOrderConfirmed(true);
               }}
             >
@@ -372,11 +517,16 @@ export default function OrderPage() {
             </Button>
           </div>
           {cart.length === 0 ? (
-            <div className="py-8 text-center text-sm text-gray-400">No items yet.</div>
+            <div className="py-8 text-center text-sm text-gray-400">
+              No items yet.
+            </div>
           ) : (
             <ul className="space-y-3">
               {cart.map((c, idx) => (
-                <li key={`${c.id}-${idx}`} className="rounded-xl border border-gray-200 p-3">
+                <li
+                  key={`${c.id}-${idx}`}
+                  className="rounded-xl border border-gray-200 p-3"
+                >
                   <div className="flex items-start justify-between">
                     <div>
                       <div className="font-medium">
@@ -387,7 +537,9 @@ export default function OrderPage() {
                       </div>
                       {(c.additions.length > 0 || c.notes) && (
                         <div className="mt-1 text-xs text-gray-600">
-                          {c.additions.length > 0 && <div>+ {c.additions.join(", ")}</div>}
+                          {c.additions.length > 0 && (
+                            <div>+ {c.additions.join(", ")}</div>
+                          )}
                           {c.notes && <div>“{c.notes}”</div>}
                         </div>
                       )}
@@ -408,8 +560,12 @@ export default function OrderPage() {
 
         {/* Center: main content area */}
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          {loading && <div className="text-sm text-gray-500">Loading menu…</div>}
-          {!loading && error && <div className="text-sm text-red-600">{error}</div>}
+          {loading && (
+            <div className="text-sm text-gray-500">Loading menu…</div>
+          )}
+          {!loading && error && (
+            <div className="text-sm text-red-600">{error}</div>
+          )}
           {!loading && !error && root && (
             <>
               {mode === "browse" && (
@@ -424,10 +580,15 @@ export default function OrderPage() {
                           </span>
                         )}
                       </div>
-                      <ProductGrid products={currentProducts} onPick={openCustomize} />
+                      <ProductGrid
+                        products={currentProducts}
+                        onPick={openCustomize}
+                      />
                     </>
                   ) : (
-                    <div className="text-sm text-gray-500">Pick a category on the right.</div>
+                    <div className="text-sm text-gray-500">
+                      Pick a category on the right.
+                    </div>
                   )}
                 </>
               )}
@@ -442,7 +603,9 @@ export default function OrderPage() {
                   adds={customAdds}
                   toggleAdd={(a) =>
                     setCustomAdds((prev) =>
-                      prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]
+                      prev.includes(a)
+                        ? prev.filter((x) => x !== a)
+                        : [...prev, a]
                     )
                   }
                   onCancel={() => {
@@ -517,7 +680,9 @@ function ProductGrid({
   onPick: (p: ProductItem) => void;
 }) {
   if (!products || products.length === 0) {
-    return <div className="text-sm text-gray-500">No products in this category.</div>;
+    return (
+      <div className="text-sm text-gray-500">No products in this category.</div>
+    );
   }
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -576,14 +741,17 @@ function CustomizeProduct({
           Unit price: <span className="font-medium">₪{product.price ?? 0}</span>
         </div>
         <div className="text-sm text-gray-700">
-          Line total: <span className="font-semibold">₪{(product.price ?? 0) * qty}</span>
+          Line total:{" "}
+          <span className="font-semibold">₪{(product.price ?? 0) * qty}</span>
         </div>
       </div>
 
       <div>
         <div className="mb-2 text-sm font-medium text-gray-700">Additions</div>
         {addOptions.length === 0 ? (
-          <div className="text-xs text-gray-500">No additions for this product.</div>
+          <div className="text-xs text-gray-500">
+            No additions for this product.
+          </div>
         ) : (
           <div className="flex flex-wrap gap-2">
             {addOptions.map((a: string) => {

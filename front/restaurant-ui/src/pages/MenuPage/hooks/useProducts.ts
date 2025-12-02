@@ -83,7 +83,7 @@ async function fetchProductsForNode(nodeId: string | null) {
     setNodeProducts([]);
     return;
   }
-  const data = await apiFetch('/api/menu-nodes/${nodeId}/products');
+  const data = await apiFetch(`/api/menu-nodes/${nodeId}/products`);
   setNodeProducts(Array.isArray(data) ? data : []);
 }
 

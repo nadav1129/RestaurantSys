@@ -2,11 +2,11 @@ import React, { useState } from "react";
 import Shell from "./layouts/Shell";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
-import ActionsPage from "./pages/ActionsPage";
+import ActionsPage from "./pages/Temp/ActionsPage";
 import EmptyPage from "./pages/EmptyPage";
 import OrderPage from "./pages/OrderPage/OrderPage";
-import ServicePage from "./pages/ServicePage";
-import ManagementPage from "./pages/ManagementPage";
+import ServicePage from "./pages/Service/ServicePage";
+import ManagementPage from "./pages/Management/ManagementPage";
 import type { Page } from "./types";
 
 export default function App() {
@@ -28,7 +28,11 @@ export default function App() {
       case "home":
         return <HomePage />;
       case "login":
-        return <LoginPage />;
+        return (
+        <LoginPage
+          onBackToUserLogin={() => setPage("home")}
+        />
+      );
       case "actions":
         return <ActionsPage />;
       case "service":

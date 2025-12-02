@@ -18,11 +18,13 @@ export default function AddProductModal({
   onSave: (data: {
     name: string;
     isBottleOnly: boolean;
+    productType: string;        // <— NEW: send product type
     lines: ProductIngredientLineDraft[];
   }) => void;
 }) {
   const [name, setName] = useState("");
   const [isBottleOnly, setIsBottleOnly] = useState(false);
+  const [isFood, setIsFood] = useState(false);   // <— NEW: food flag
 
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [ingLoading, setIngLoading] = useState<boolean>(false);
@@ -96,11 +98,29 @@ export default function AddProductModal({
       }))
       .filter((l) => l.ingredientId && (isBottleOnly ? true : l.amount));
 
+    const productType = isFood ? "food" : "default";  // <— decide type
+
     onSave({
       name: name.trim(),
       isBottleOnly,
+      productType,                                    // <— pass it
       lines: cleaned,
     });
+  }
+
+  // Handlers to keep "bottle only" vs "food" mutually exclusive
+  function handleBottleOnlyChange(checked: boolean) {
+    setIsBottleOnly(checked);
+    if (checked) {
+      setIsFood(false);
+    }
+  }
+
+  function handleFoodChange(checked: boolean) {
+    setIsFood(checked);
+    if (checked) {
+      setIsBottleOnly(false);
+    }
   }
 
   return (
@@ -137,17 +157,32 @@ export default function AddProductModal({
               />
             </div>
 
-            <div className="col-span-2 flex items-center gap-2">
-              <input
-                id="bottleOnly"
-                type="checkbox"
-                className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
-                checked={isBottleOnly}
-                onChange={(e) => setIsBottleOnly(e.target.checked)}
-              />
-              <label htmlFor="bottleOnly" className="text-xs font-semibold text-gray-700">
-                Sold as full bottle only
-              </label>
+            <div className="col-span-2 flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <input
+                  id="bottleOnly"
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                  checked={isBottleOnly}
+                  onChange={(e) => handleBottleOnlyChange(e.target.checked)}
+                />
+                <label htmlFor="bottleOnly" className="text-xs font-semibold text-gray-700">
+                  Sold as full bottle only
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  id="foodType"
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                  checked={isFood}
+                  onChange={(e) => handleFoodChange(e.target.checked)}
+                />
+                <label htmlFor="foodType" className="text-xs font-semibold text-gray-700">
+                  Food
+                </label>
+              </div>
             </div>
           </div>
 

@@ -7,9 +7,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Floor\**" />
+    <Compile Remove="Hostess\**" />
+    <Content Remove="Floor\**" />
+    <Content Remove="Hostess\**" />
+    <EmbeddedResource Remove="Floor\**" />
+    <EmbeddedResource Remove="Hostess\**" />
+    <None Remove="Floor\**" />
+    <None Remove="Hostess\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="dbup-core" Version="6.0.4" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
+    <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.15.0" />
     <PackageReference Include="Npgsql" Version="9.0.4" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.15.0" />
   </ItemGroup>
 
 <ItemGroup>
@@ -19,8 +34,7 @@
 </ItemGroup>
 
 <ItemGroup>
-  <Folder Include="Floor\" />
-  <Folder Include="Hostess\" />
+  <Folder Include="src\Checker\" />
 </ItemGroup>
 
 

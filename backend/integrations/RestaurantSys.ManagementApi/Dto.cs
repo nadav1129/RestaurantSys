@@ -74,7 +74,7 @@ namespace RestaurantSys.Api
     }
 
 
-    /* Each ingredient component within a product */
+    // Each ingredient component within a product 
     public sealed class CreateProductComponentRequest
     {
         public Guid IngredientId { get; set; }
@@ -161,7 +161,7 @@ namespace RestaurantSys.Api
         public string? StationType { get; set; }
     }
 
-    /* ============ STATIONS ============ */
+    /* ============ Lists ============ */
     public sealed class ListDto
     {
         public Guid ListId { get; init; }
@@ -195,19 +195,283 @@ namespace RestaurantSys.Api
         public int? Minutes { get; init; }
     }
 
-    public sealed class TableDto 
+    /* ============ Tables ============ */
+    public sealed class TableDto
     {
-       public Guid TableId { get; set; }
-       public int TableNum { get; set; }
+        public Guid TableId { get; set; }
+        public int TableNum { get; set; }
     }
 
-    public sealed class CreateStationTableRequest 
+    public sealed class CreateStationTableRequest
     {
         public int TableNum { get; set; }
     }
     public sealed class UpdateTableRequest
-    { 
+    {
         public int TableNum { get; set; }
     }
 
+    /* ============ User ============ */
+    public sealed class UserDto
+    {
+        public Guid UserId { get; set; }
+        public string Name { get; set; } = "temp";
+        public string Role { get; set; } = "user";
+
+    }
+
+    public sealed class CreateUserRequest
+    {
+        public Guid WorkerId { get; set; }
+        public string? Role { get; set; } = "user";
+        public string? Passcode { get; set; }
+    }
+
+    public sealed class LoginRequest
+    {
+        public Guid UserId { get; set; }
+        public string Passcode { get; set; } = string.Empty;
+    }
+
+    /* ============ Worker ============ */
+    public sealed class WorkerDto
+    {
+        [JsonPropertyName("workerId")]
+        public Guid WorkerId { get; set; }
+
+        [JsonPropertyName("firstName")]
+        public string FirstName { get; set; } = string.Empty;
+
+        [JsonPropertyName("lastName")]
+        public string LastName { get; set; } = string.Empty;
+
+        [JsonPropertyName("personalId")]
+        public string? PersonalId { get; set; }
+
+        [JsonPropertyName("email")]
+        public string? Email { get; set; }
+
+        [JsonPropertyName("phone")]
+        public string? Phone { get; set; }
+
+        [JsonPropertyName("position")]
+        public string Position { get; set; } = string.Empty;
+
+        [JsonPropertyName("salaryCents")]
+        public int? SalaryCents { get; set; }
+
+        [JsonPropertyName("createdAt")]
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public sealed class CreateWorkerRequest
+    {
+        [JsonPropertyName("firstName")]
+        public string? FirstName { get; set; }
+
+        [JsonPropertyName("lastName")]
+        public string? LastName { get; set; }
+
+        [JsonPropertyName("position")]
+        public string? Position { get; set; }
+
+        [JsonPropertyName("personalId")]
+        public string? PersonalId { get; set; }
+
+        [JsonPropertyName("email")]
+        public string? Email { get; set; }
+
+        [JsonPropertyName("phone")]
+        public string? Phone { get; set; }
+
+        [JsonPropertyName("salaryCents")]
+        public int? SalaryCents { get; set; }
+    }
+
+    public sealed class CreateWorkerResponse
+    {
+        [JsonPropertyName("worker")]
+        public WorkerDto Worker { get; set; } = default!;
+
+        [JsonPropertyName("loginCode")]
+        public string LoginCode { get; set; } = string.Empty;
+    }
+
+    /* =========================
+     * Device
+     * ========================= */
+
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public enum DeviceType
+    {
+        fixedDevice,   // we’ll serialize as "fixed"
+        personalDevice // we’ll serialize as "personal"
+    }
+
+    public static class DeviceTypeStrings
+    {
+        public const string Fixed = "fixed";
+        public const string Personal = "personal";
+    }
+
+    /* =========================
+     * Shift
+     * ========================= */
+
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public enum ShiftStatus
+    {
+        planned,
+        active,
+        closed,
+        cancelled
+    }
+    public sealed class ShiftDto
+    {
+        [JsonPropertyName("shiftId")]
+        public Guid ShiftId { get; init; }
+
+        [JsonPropertyName("name")]
+        public string? Name { get; init; } = "s";
+
+        [JsonPropertyName("plannedStartAt")]
+        public DateTimeOffset? PlannedStartAt { get; init; }
+
+        [JsonPropertyName("plannedEndAt")]
+        public DateTimeOffset? PlannedEndAt { get; init; }
+
+        [JsonPropertyName("startedAt")]
+        public DateTimeOffset? StartedAt { get; init; }
+
+        [JsonPropertyName("endedAt")]
+        public DateTimeOffset? EndedAt { get; init; }
+
+        [JsonPropertyName("status")]
+        public ShiftStatus Status { get; init; }
+
+        [JsonPropertyName("createdAt")]
+        public DateTimeOffset CreatedAt { get; init; }
+    }
+
+    public sealed class CreateShiftRequest
+    {
+        [JsonPropertyName("name")]
+        public string? Name { get; init; } = "s";
+
+        [JsonPropertyName("plannedStartAt")]
+        public DateTimeOffset? PlannedStartAt { get; init; }
+
+        [JsonPropertyName("plannedEndAt")]
+        public DateTimeOffset? PlannedEndAt { get; init; }
+    }
+
+    public sealed class CloseShiftResponse
+    {
+        [JsonPropertyName("shiftId")]
+        public Guid ShiftId { get; init; }
+
+        [JsonPropertyName("endedAt")]
+        public DateTimeOffset EndedAt { get; init; }
+    }
+
+    /* =========================
+     * Shift Workers
+     * ========================= */
+
+    public sealed class ShiftWorkerDto
+    {
+        [JsonPropertyName("shiftWorkerId")]
+        public Guid ShiftWorkerId { get; init; }
+
+        [JsonPropertyName("shiftId")]
+        public Guid ShiftId { get; init; }
+
+        [JsonPropertyName("workerId")]
+        public Guid WorkerId { get; init; }
+
+        [JsonPropertyName("stationId")]
+        public Guid? StationId { get; init; }
+
+        [JsonPropertyName("positionSnapshot")]
+        public string PositionSnapshot { get; init; } = "Worker";
+
+        [JsonPropertyName("salaryCentsSnapshot")]
+        public int? SalaryCentsSnapshot { get; init; }
+
+        [JsonPropertyName("startedAt")]
+        public DateTimeOffset StartedAt { get; init; }
+
+        [JsonPropertyName("endedAt")]
+        public DateTimeOffset? EndedAt { get; init; }
+
+        [JsonPropertyName("deviceType")]
+        public string DeviceType { get; init; } = DeviceTypeStrings.Fixed; // "fixed" | "personal"
+
+        [JsonPropertyName("name")]
+        public string Name { get; init; } = "(no name)";
+    }
+
+    public sealed class ClockInRequest
+    {
+        [JsonPropertyName("workerId")]
+        public Guid WorkerId { get; init; }
+
+        [JsonPropertyName("stationId")]
+        public Guid? StationId { get; init; }
+
+        // keep as string "fixed"/"personal" to match DB CHECK and avoid enum-string mapping issues at SQL layer
+        [JsonPropertyName("deviceType")]
+        public string DeviceType { get; init; } = DeviceTypeStrings.Fixed;
+    }
+
+    public sealed class ClockInResponse
+    {
+        [JsonPropertyName("shiftWorkerId")]
+        public Guid ShiftWorkerId { get; init; }
+
+        [JsonPropertyName("shiftId")]
+        public Guid ShiftId { get; init; }
+
+        [JsonPropertyName("workerId")]
+        public Guid WorkerId { get; init; }
+
+        [JsonPropertyName("stationId")]
+        public Guid? StationId { get; init; }
+
+        [JsonPropertyName("positionSnapshot")]
+        public string PositionSnapshot { get; init; } = "Worker";
+
+        [JsonPropertyName("salaryCentsSnapshot")]
+        public int? SalaryCentsSnapshot { get; init; }
+
+        [JsonPropertyName("startedAt")]
+        public DateTimeOffset StartedAt { get; init; }
+
+        [JsonPropertyName("deviceType")]
+        public string DeviceType { get; init; } = DeviceTypeStrings.Fixed;
+    }
+
+    public sealed class ClockOutRequest
+    {
+        [JsonPropertyName("workerId")]
+        public Guid WorkerId { get; init; }
+    }
+
+    public sealed class ClockOutResponse
+    {
+        [JsonPropertyName("shiftWorkerId")]
+        public Guid ShiftWorkerId { get; init; }
+
+        [JsonPropertyName("shiftId")]
+        public Guid ShiftId { get; init; }
+
+        [JsonPropertyName("workerId")]
+        public Guid WorkerId { get; init; }
+
+        [JsonPropertyName("startedAt")]
+        public DateTimeOffset StartedAt { get; init; }
+
+        [JsonPropertyName("endedAt")]
+        public DateTimeOffset EndedAt { get; init; }
+    }
 }
