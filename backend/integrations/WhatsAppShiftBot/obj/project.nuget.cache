@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "wT78jvHWLRQ=",
+  "dgSpecHash": "RApM0EQjgXo=",
   "success": true,
   "projectFilePath": "C:\\Projects\\RestaurantSys\\backend\\integrations\\WhatsAppShiftBot\\WhatsAppWebhook.csproj",
   "expectedPackageFiles": [
@@ -22,9 +22,13 @@
     "C:\\Users\\nadi1\\.nuget\\packages\\microsoft.extensions.options.configurationextensions\\9.0.9\\microsoft.extensions.options.configurationextensions.9.0.9.nupkg.sha512",
     "C:\\Users\\nadi1\\.nuget\\packages\\microsoft.extensions.primitives\\9.0.9\\microsoft.extensions.primitives.9.0.9.nupkg.sha512",
     "C:\\Users\\nadi1\\.nuget\\packages\\npgsql\\9.0.4\\npgsql.9.0.4.nupkg.sha512",
+    "C:\\Users\\nadi1\\.nuget\\packages\\openai\\2.7.0\\openai.2.7.0.nupkg.sha512",
     "C:\\Users\\nadi1\\.nuget\\packages\\rbush.signed\\4.0.0\\rbush.signed.4.0.0.nupkg.sha512",
     "C:\\Users\\nadi1\\.nuget\\packages\\sixlabors.fonts\\1.0.0\\sixlabors.fonts.1.0.0.nupkg.sha512",
-    "C:\\Users\\nadi1\\.nuget\\packages\\system.io.packaging\\8.0.1\\system.io.packaging.8.0.1.nupkg.sha512"
+    "C:\\Users\\nadi1\\.nuget\\packages\\system.clientmodel\\1.8.1\\system.clientmodel.1.8.1.nupkg.sha512",
+    "C:\\Users\\nadi1\\.nuget\\packages\\system.io.packaging\\8.0.1\\system.io.packaging.8.0.1.nupkg.sha512",
+    "C:\\Users\\nadi1\\.nuget\\packages\\system.memory.data\\8.0.1\\system.memory.data.8.0.1.nupkg.sha512",
+    "C:\\Users\\nadi1\\.nuget\\packages\\system.net.serversentevents\\9.0.9\\system.net.serversentevents.9.0.9.nupkg.sha512"
   ],
   "logs": []
 }

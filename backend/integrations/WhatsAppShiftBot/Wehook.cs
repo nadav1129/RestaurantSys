@@ -1,261 +1,273 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
+﻿#nullable enable
+
 using Microsoft.Extensions.Logging;
 using Npgsql;
-using RestaurantSys.Domain;
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Diagnostics.Metrics;
-using System.Security;
+using OpenAI.Chat;
 using System.Text.Json;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using WhatsAppWebhook.Application.Commands;
-using WhatsAppWebhook.Application.Nlu;
 
 var builder = WebApplication.CreateBuilder(args);
 
-/* Force Kestrel to :8080 */
-builder.WebHost.UseUrls("http://localhost:8080");
+/* -------------------------------------------------
+ * Configuration
+ * ------------------------------------------------- */
+var connString =
+    builder.Configuration.GetConnectionString("AppDb")
+    ?? builder.Configuration["DB"]
+    ?? builder.Configuration["POSTGRES_CONNECTION"]
+    ?? builder.Configuration["POSTGRES_CONNECTION_STRING"]
+    ?? "Host=localhost;Username=postgres;Password=postgres;Database=restaurantsys";
 
-/* Logging */
-builder.Services.AddLogging(c => c.AddConsole());
+/* -------------------------------------------------
+ * Services (DI)
+ * ------------------------------------------------- */
+builder.Services.AddSingleton<Npgsql.NpgsqlDataSource>(_ =>
+    Npgsql.NpgsqlDataSource.Create(connString));
+builder.Services.AddHttpClient();
 
-/* Force Postgres to 5434 */
-var pgConn = "Host=127.0.0.1;Port=5434;Username=postgres;Password=postgres;Database=postgres";
-builder.Services.AddSingleton<NpgsqlDataSource>(_ => NpgsqlDataSource.Create(pgConn));
-// NpgsqlDataSource singleton
-var connString = builder.Configuration.GetConnectionString("pg")
-                 ?? "Host=localhost;Port=5433;Username=postgres;Password=postgres;Database=postgres";
-builder.Services.AddSingleton(NpgsqlDataSource.Create(connString));
-
-/* NLU + Commands + Idempotency */
-builder.Services.AddSingleton<IIntentParser, RuleBasedParser>();
 builder.Services.AddSingleton<IIdempotencyStore, PgIdempotencyStore>();
-builder.Services.AddScoped<CommandRouter>();
-builder.Services.AddSingleton(new TipFormulaConfig(
-    TaxPercentB: 12.0m,
-    ManagersPercentC: 10.0m,
-    Rules: new[]
-    {
-        new RoleRule("Waiter",     true,  false, false, 45m),
-        new RoleRule("Hostess",    true,  false, false, 40m),
-        new RoleRule("Bartender",  true,  false, false, 50m),
-        new RoleRule("Dishwasher", false, false, true,  null),
-        new RoleRule("Manager",    false, true,  false, null),
-    }
-));
 
-var publicBaseUrl = builder.Configuration["PublicBaseUrl"]
-                    ?? "https://<your-tunnel>.trycloudflare.com";
+/* LLM brain that will call your ManagementApi via tool-calling.
+ * Make sure you added LlmOrchestrator.cs to the project. */
+builder.Services.AddSingleton<LlmOrchestrator>();
+
 builder.Services.AddSingleton(sp =>
 {
-    var db = sp.GetRequiredService<NpgsqlDataSource>();
-    var tip = sp.GetRequiredService<TipFormulaConfig>();
-    return new CommandRouter(db, tip, publicBaseUrl);
+    var cfg = sp.GetRequiredService<IConfiguration>();
+    var apiKey = cfg["OpenAI:ApiKey"];
+    if (string.IsNullOrWhiteSpace(apiKey))
+        throw new InvalidOperationException("OpenAI:ApiKey is not configured.");
+
+    // pick your model
+    var model = cfg["OpenAI:Model"] ?? "gpt-4.1-mini";
+
+    return new ChatClient(model, apiKey);
 });
+
+// LlmToolRegistry (whatever your implementation is)
+builder.Services.AddSingleton<LlmToolRegistry>();
+
+
+/* ============ Route register ============ */
+// Shift
+builder.Services.AddLlmToolsFromAssembly(typeof(ShiftControlTool).Assembly);
+
 
 var app = builder.Build();
 
-/* Health check: GET / → 200 OK */
-app.MapGet("/", () => Results.Ok("OK"));
+/* -------------------------------------------------
+ * Health
+ * ------------------------------------------------- */
+app.MapGet("/", () => Results.Text("WhatsApp webhook is up.", "text/plain"));
 
-/* Twilio minimal echo handler: POST /twilio/adapter-test
-   Accepts form-encoded fields and returns TwiML XML so Twilio replies on WhatsApp. */
-app.MapPost("/twilio/adapter-test", async (HttpRequest req, ILogger<Program> log) =>
+/* -------------------------------------------------
+ * Twilio: quick manual test endpoint (form-encoded echo)
+ * ------------------------------------------------- */
+app.MapPost("/twilio/adapter-test", async (HttpRequest req) =>
 {
+    if (!req.HasFormContentType)
+    {
+        const string bad = "<?xml version=\"1.0\"?><Response><Message>Bad content type</Message></Response>";
+        return Results.Content(bad, "text/xml");
+    }
+
     var form = await req.ReadFormAsync();
+    var echo = form["Body"].ToString();
 
-    var from = form["From"].ToString();          // e.g., "whatsapp:+9725..."
-    var body = form["Body"].ToString();          // e.g., "ping"
-    var msgSid = form["MessageSid"].ToString();  // idempotency key if you need
-
-    log.LogInformation("TWILIO IN: From={From} Body={Body} Sid={Sid}", from, body, msgSid);
-
-    var reply = $"Echo: {body} (from {from})";
-
-    var xmlOk = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Message>"
-                + System.Security.SecurityElement.Escape(reply)
-                + "</Message></Response>";
-
-    return Results.Content(xmlOk, "text/xml");
+    var xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Message>"
+              + System.Security.SecurityElement.Escape($"Echo: {echo}")
+              + "</Message></Response>";
+    return Results.Content(xml, "text/xml");
 });
 
-
-/* ----------------- Twilio → Meta adapter (form → unified core) ----------------- */
-/*  */
+app.MapGet("/twilio/adapter-test", () =>
+    Results.Text("adapter-test GET alive", "text/plain"));
+/* -------------------------------------------------
+ * Twilio → WhatsApp inbound
+ * ------------------------------------------------- */
 app.MapPost("/twilio/adapter", async (
     HttpRequest req,
-    NpgsqlDataSource db,
-    ILogger<Program> log,
-    IIntentParser nlu,
-    CommandRouter router,
-    IIdempotencyStore idem) =>
+    ILoggerFactory lf,
+    IIdempotencyStore idem,
+    LlmOrchestrator llm) =>
 {
+    var log = lf.CreateLogger("TwilioAdapter");
+
+    log.LogInformation("=== Twilio /twilio/adapter HIT === ContentType={ContentType}", req.ContentType);
+
     try
     {
         if (!req.HasFormContentType)
         {
+            log.LogWarning("Twilio request does NOT have form content type. ContentType={ContentType}", req.ContentType);
+
             const string bad = "<?xml version=\"1.0\"?><Response><Message>Bad content type</Message></Response>";
             return Results.Content(bad, "text/xml");
         }
 
         var form = await req.ReadFormAsync();
+
+        log.LogInformation("Twilio form keys: {Keys}", string.Join(", ", form.Keys));
+
         var messageId = form["MessageSid"].ToString();
-        var from = form["From"].ToString();              // "whatsapp:+9725..."
+        var from = form["From"].ToString();         /* e.g. 'whatsapp:+9725...' */
         var body = form["Body"].ToString() ?? string.Empty;
 
-        // Normalize to +E.164 (strip "whatsapp:")
-        // Checks if the string begins with "whatsapp:" (case-insensitive).
-        // If true, take everything after that prefix:
+        log.LogInformation("Incoming Twilio message: MessageSid={MessageSid}, From={From}, Body={Body}",
+            messageId, from, body);
+
         var fromE164 = from.StartsWith("whatsapp:", StringComparison.OrdinalIgnoreCase)
             ? from.Substring("whatsapp:".Length)
             : from;
-        Console.WriteLine($"[FROM] raw='{from}'  e164='{fromE164}'");
 
-        // Do the work inline so the insert actually happens before replying
-        var reply = await ChatLogic.HandleInboundCore(db, log, nlu, router, idem, messageId, fromE164, body);
+        if (string.IsNullOrWhiteSpace(messageId))
+        {
+            messageId = $"{fromE164}|{body}|{DateTimeOffset.UtcNow:yyyyMMddHHmm}";
+            log.LogWarning("MessageSid was empty, generated fallback messageId={MessageId}", messageId);
+        }
 
-        // TwiML(Twilio expected reply form) reply (what you see in WhatsApp)
+        /* Idempotency */
+        var isNew = await idem.TryBeginAsync(messageId);
+        log.LogInformation("Idempotency check for {MessageId}: isNew={IsNew}", messageId, isNew);
+
+        if (!isNew)
+        {
+            const string xmlDup = "<?xml version=\"1.0\"?><Response><Message>Already processed.</Message></Response>";
+            log.LogInformation("Duplicate message detected, returning Already processed TwiML.");
+            return Results.Content(xmlDup, "text/xml");
+        }
+
+        string reply;
+        try
+        {
+            log.LogInformation("Calling LlmOrchestrator for from={FromE164}", fromE164);
+            reply = await llm.HandleInboundAsync(fromE164, body, req.HttpContext.RequestAborted);
+            log.LogInformation("LlmOrchestrator reply: {Reply}", reply);
+        }
+        finally
+        {
+            await idem.EndAsync();
+            log.LogInformation("Idempotency.EndAsync() called for {MessageId}", messageId);
+        }
+
         var xmlOk = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Message>"
-                    + SecurityElement.Escape(reply)
+                    + System.Security.SecurityElement.Escape(reply)
                     + "</Message></Response>";
+
+        log.LogInformation("Sending TwiML response back to Twilio.");
         return Results.Content(xmlOk, "text/xml");
     }
     catch (Exception ex)
     {
         log.LogError(ex, "Twilio adapter error");
-        const string xmlErr = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Message>Server error</Message></Response>";
+        const string xmlErr = "<?xml version=\"1.0\"?><Response><Message>Server error</Message></Response>";
         return Results.Content(xmlErr, "text/xml");
     }
 });
 
-/* ----------------- Meta Cloud API webhook (JSON → unified core) ----------------- */
-app.MapPost("/webhook/whatsapp", async (
-    HttpRequest req,
-    NpgsqlDataSource db,
-    ILogger log,
-    IIntentParser nlu,
-    CommandRouter router,
-    IIdempotencyStore idem) =>
+
+/* -------------------------------------------------
+ * Meta (WhatsApp Cloud API) verification (GET)
+ * Set WhatsApp:VerifyToken in config if you want to verify.
+ * ------------------------------------------------- */
+app.MapGet("/webhook/whatsapp", (HttpRequest req) =>
 {
-    using var doc = await JsonDocument.ParseAsync(req.Body);
-    var root = doc.RootElement;
-    var entry = root.GetProperty("entry")[0].GetProperty("changes")[0].GetProperty("value");
-    var msg = entry.GetProperty("messages")[0];
+    var mode = req.Query["hub.mode"].ToString();
+    var token = req.Query["hub.verify_token"].ToString();
+    var challenge = req.Query["hub.challenge"].ToString();
 
-    var messageId = msg.GetProperty("id").GetString() ?? string.Empty;
-    var fromPhone = msg.GetProperty("from").GetString() ?? string.Empty;  /* usually digits without '+' */
-    var text = msg.GetProperty("text").GetProperty("body").GetString() ?? string.Empty;
+    var expected = builder.Configuration["WhatsApp:VerifyToken"];
+    if (mode == "subscribe" && !string.IsNullOrEmpty(challenge) && (string.IsNullOrEmpty(expected) || token == expected))
+    {
+        return Results.Text(challenge, "text/plain");
+    }
 
-    if (!fromPhone.StartsWith("+")) fromPhone = "+" + fromPhone;
-
-    var reply = await ChatLogic.HandleInboundCore(db, log, nlu, router, idem, messageId, fromPhone, text);
-    return Results.Text(reply, "text/plain");
+    return Results.Unauthorized();
 });
 
-/* Health ping (optional) */
-app.MapGet("/health", () => Results.Ok(new { ok = true }));
-
-/* Run the app — NOTE: last statement before the class below */
-app.Run();
-
-/* ----------------- NO TOP-LEVEL STATEMENTS AFTER THIS LINE ----------------- */
-static class ChatLogic
+/* -------------------------------------------------
+ * Meta (WhatsApp Cloud API) inbound (POST JSON)
+ * ------------------------------------------------- */
+app.MapPost("/webhook/whatsapp", async (
+    HttpRequest req,
+    ILoggerFactory lf,
+    IIdempotencyStore idem,
+    LlmOrchestrator llm) =>
 {
-    public static async Task<string> HandleInboundCore(
-        NpgsqlDataSource db,
-        ILogger log,
-        IIntentParser nlu,
-        CommandRouter router,
-        IIdempotencyStore idem,
-        string messageId,
-        string fromE164,
-        string textRaw)
+    var log = lf.CreateLogger("MetaWebhook");
+
+    try
     {
-        var text = (textRaw ?? string.Empty).Trim();
+        using var doc = await JsonDocument.ParseAsync(req.Body);
+        var root = doc.RootElement;
 
-        /* Idempotency */
+        /* Defensive parsing for WhatsApp Cloud API shape */
+        var entry = root.TryGetProperty("entry", out var entries) && entries.GetArrayLength() > 0
+            ? entries[0]
+            : default;
+
+        var change = entry.ValueKind != JsonValueKind.Undefined &&
+                     entry.TryGetProperty("changes", out var changes) &&
+                     changes.GetArrayLength() > 0
+            ? changes[0]
+            : default;
+
+        var value = change.ValueKind != JsonValueKind.Undefined &&
+                    change.TryGetProperty("value", out var v)
+            ? v
+            : default;
+
+        var messages = value.ValueKind != JsonValueKind.Undefined &&
+                       value.TryGetProperty("messages", out var msgs) &&
+                       msgs.ValueKind == JsonValueKind.Array &&
+                       msgs.GetArrayLength() > 0
+            ? msgs[0]
+            : default;
+
+        if (messages.ValueKind == JsonValueKind.Undefined)
+            return Results.Ok(); /* no message */
+
+        var messageId = messages.TryGetProperty("id", out var mid) ? mid.GetString() ?? "" : "";
+        var fromPhone = messages.TryGetProperty("from", out var fromEl) ? fromEl.GetString() ?? "" : "";
+        var textBody = messages.TryGetProperty("text", out var t) && t.TryGetProperty("body", out var b) ? b.GetString() ?? "" : "";
+
+        if (!fromPhone.StartsWith("+") && fromPhone.Length > 0)
+            fromPhone = "+" + fromPhone;
+
         if (string.IsNullOrWhiteSpace(messageId))
-            messageId = $"{fromE164}|{text}|{DateTimeOffset.UtcNow:yyyyMMddHHmm}";
-        if (!await idem.TryBeginAsync(messageId))
-            return "✅ Already processed.";
+            messageId = $"{fromPhone}|{textBody}|{DateTimeOffset.UtcNow:yyyyMMddHHmm}";
 
+        if (!await idem.TryBeginAsync(messageId))
+            return Results.Text("Already processed.", "text/plain");
+
+        string reply;
         try
         {
-            /* Optional: current phone→worker lookup (kept only for logs / future use) */
-            Guid? workerId = null;
-            await using (var c1 = db.CreateCommand(
-                "select worker_id from public.workers where phone_e164=$1"))
-            {
-                c1.Parameters.AddWithValue(fromE164);
-                await using var r = await c1.ExecuteReaderAsync();
-                if (await r.ReadAsync()) workerId = r.GetGuid(0);
-            }
-            Console.WriteLine($"[LOOKUP] phone='{fromE164}'  workerId={(workerId?.ToString() ?? "null")}");
-
-            /* Parse → Route (only the streamlined commands) */
-            var parsed = nlu.Parse(text);
-            Console.WriteLine($"[INTENT] intent={parsed.Intent} text='{text}'");
-
-            var reply = await router.HandleAsync(fromE164, text, parsed);
-            return reply;
+            reply = await llm.HandleInboundAsync(fromPhone, textBody, req.HttpContext.RequestAborted);
         }
         finally
         {
             await idem.EndAsync();
         }
+
+        /* Your actual send-back is usually via Graph API call; returning 200 is enough here. */
+        return Results.Text(reply, "text/plain");
     }
+    catch (Exception ex)
+    {
+        log.LogError(ex, "Meta webhook error");
+        return Results.Problem("Server error");
+    }
+});
 
+app.Run();
 
-    /* ----------------- helpers ----------------- */
-
-    /* reserve 20:00 4 Dana   OR   reserve 2025-10-08 20:00 4 Dana */
-    //static bool TryParseReservation(string raw, out (DateTimeOffset when, int party, string name) resv)
-    //{
-    //    var m = Regex.Match(raw, @"reserve\s+((?:\d{4}-\d{2}-\d{2}\s+)?\d{1,2}:\d{2})\s+(\d+)\s+(.+)$", RegexOptions.IgnoreCase);
-    //    if (m.Success)
-    //    {
-    //        var whenStr = m.Groups[1].Value;
-    //        var when = DateTimeOffset.TryParse(whenStr, out var dt)
-    //            ? dt
-    //            : DateTimeOffset.Parse($"{DateTimeOffset.Now:yyyy-MM-dd} {whenStr}");
-    //        resv = (when, int.Parse(m.Groups[2].Value), m.Groups[3].Value.Trim());
-    //        return true;
-    //    }
-    //    resv = default;
-    //    return false;
-    //}
-
-    
-    //static async Task<string> HandleReservation(NpgsqlDataSource db, Guid? workerId, (DateTimeOffset when, int party, string name) resv)
-    //{
-    //    await using var c = db.CreateCommand(
-    //        "insert into reservations(reservation_id,name,party_size,starts_at,created_by_worker) values ($1,$2,$3,$4,$5)");
-    //    c.Parameters.AddWithValue(Guid.NewGuid());
-    //    c.Parameters.AddWithValue(resv.name);
-    //    c.Parameters.AddWithValue(resv.party);
-    //    c.Parameters.AddWithValue(resv.when);
-    //    c.Parameters.AddWithValue((object?)workerId ?? DBNull.Value);
-    //    await c.ExecuteNonQueryAsync();
-    //    return $"✅ Reserved {resv.party} for {resv.name} at {resv.when:yyyy-MM-dd HH:mm}.";
-    //}
-
-    //static async Task<string> RenderMenu(NpgsqlDataSource db)
-    //{
-    //    await using var c = db.CreateCommand("select name, price, coalesce(category,'') from products order by category nulls last, name");
-    //    await using var r = await c.ExecuteReaderAsync();
-    //    var lines = new List<string>();
-    //    while (await r.ReadAsync())
-    //    {
-    //        var cat = r.GetString(2);
-    //        var line = string.IsNullOrEmpty(cat)
-    //            ? string.Format("{0} — {1:0.##}", r.GetString(0), r.GetDecimal(1))
-    //            : string.Format("{0} — {1:0.##} ({2})", r.GetString(0), r.GetDecimal(1), cat);
-    //        lines.Add(line);
-    //    }
-    //    return (lines.Count == 0) ? "No items yet." : string.Join("\n", lines);
-    //}
-}
+/* -------------------------------------------------
+ * Notes:
+ * - This file intentionally removes:
+ *   - RuleBasedParser / IIntentParser registrations
+ *   - CommandRouter registration
+ *   - Any TipFormulaConfig usage
+ * - Make sure LlmOrchestrator.cs exists and is registered above.
+ * - PgIdempotencyStore.cs depends on NpgsqlDataSource from AddNpgsqlDataSource.
+ * ------------------------------------------------- */

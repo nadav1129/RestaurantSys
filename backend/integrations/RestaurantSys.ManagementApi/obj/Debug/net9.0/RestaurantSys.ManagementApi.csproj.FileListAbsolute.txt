@@ -128,3 +128,16 @@ C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\obj\D
 C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\obj\Debug\net9.0\RestaurantSys.ManagementApi.genruntimeconfig.cache
 C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\obj\Debug\net9.0\ref\RestaurantSys.ManagementApi.dll
 C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\obj\Debug\net9.0\RestaurantSys.ManagementApi.sourcelink.json
+C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\bin\Debug\net9.0\BCrypt.Net-Next.dll
+C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\bin\Debug\net9.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\bin\Debug\net9.0\Microsoft.IdentityModel.Abstractions.dll
+C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\bin\Debug\net9.0\Microsoft.IdentityModel.JsonWebTokens.dll
+C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\bin\Debug\net9.0\Microsoft.IdentityModel.Logging.dll
+C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\bin\Debug\net9.0\Microsoft.IdentityModel.Protocols.dll
+C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\bin\Debug\net9.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\bin\Debug\net9.0\Microsoft.IdentityModel.Tokens.dll
+C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\bin\Debug\net9.0\System.IdentityModel.Tokens.Jwt.dll
+C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\bin\Debug\net9.0\OpenAI.dll
+C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\bin\Debug\net9.0\System.ClientModel.dll
+C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\bin\Debug\net9.0\System.Memory.Data.dll
+C:\Projects\RestaurantSys\backend\integrations\RestaurantSys.ManagementApi\bin\Debug\net9.0\System.Net.ServerSentEvents.dll

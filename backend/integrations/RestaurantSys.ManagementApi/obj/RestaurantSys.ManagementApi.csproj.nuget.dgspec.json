@@ -70,6 +70,10 @@
               "target": "Package",
               "version": "[9.0.4, )"
             },
+            "OpenAI": {
+              "target": "Package",
+              "version": "[2.7.0, )"
+            },
             "System.IdentityModel.Tokens.Jwt": {
               "target": "Package",
               "version": "[8.15.0, )"
