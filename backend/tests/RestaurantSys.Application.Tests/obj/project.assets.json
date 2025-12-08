@@ -5514,11 +5514,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Projects\\RestaurantSys\\tests\\RestaurantSys.Application.Tests\\RestaurantSys.Application.Tests.csproj",
+      "projectUniqueName": "C:\\Projects\\RestaurantSys\\backend\\tests\\RestaurantSys.Application.Tests\\RestaurantSys.Application.Tests.csproj",
       "projectName": "RestaurantSys.Application.Tests",
-      "projectPath": "C:\\Projects\\RestaurantSys\\tests\\RestaurantSys.Application.Tests\\RestaurantSys.Application.Tests.csproj",
+      "projectPath": "C:\\Projects\\RestaurantSys\\backend\\tests\\RestaurantSys.Application.Tests\\RestaurantSys.Application.Tests.csproj",
       "packagesPath": "C:\\Users\\nadi1\\.nuget\\packages\\",
-      "outputPath": "C:\\Projects\\RestaurantSys\\tests\\RestaurantSys.Application.Tests\\obj\\",
+      "outputPath": "C:\\Projects\\RestaurantSys\\backend\\tests\\RestaurantSys.Application.Tests\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

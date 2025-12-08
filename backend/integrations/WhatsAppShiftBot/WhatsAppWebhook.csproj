@@ -9,16 +9,16 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.9" />
     <PackageReference Include="Npgsql" Version="9.0.4" />
+    <PackageReference Include="OpenAI" Version="2.7.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\RestaurantSys.Application\RestaurantSys.Application.csproj" />
-    <ProjectReference Include="..\..\src\RestaurantSys.ConsoleRunner\RestaurantSys.ConsoleRunner.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Application\Commands\" />
-    <Folder Include="Application\Nlu\" />
+    <Folder Include="EndPoints\" />
   </ItemGroup>
 
 </Project>

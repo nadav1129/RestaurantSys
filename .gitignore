@@ -1,6 +1,8 @@
 # Global ignore patterns for whole project
 # =========================================
-
+echo **/appsettings.Development.json>>.gitignore
+echo **/appsettings.Local.json>>.gitignore
+echo .env.*>>.gitignore
 
 # IDE caches
 .vs/
@@ -30,6 +32,8 @@ docker-compose.override.yml
 deploy/postgres-data/
 pgdata/
 db-data/
+
+
 
 # Logs
 *.log

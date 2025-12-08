@@ -376,7 +376,10 @@ CREATE INDEX IF NOT EXISTS ix_order_items_order   ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS ix_order_items_product ON order_items(product_id);
 CREATE INDEX IF NOT EXISTS ix_order_items_worker  ON order_items(entered_by_worker_id);
 
-
+create table if not exists webhook_receipts (
+    message_id   text primary key,
+    received_at  timestamptz not null default now()
+);
 
 -- ===== Triggers & functions =====
 

@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("RestaurantSys.ConsoleRunner")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+17bf6f017b8469b184770638fa5a3992c6f19012")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5ec5ee50f9fcaa7780c364b2ce98625908e659fb")]
 [assembly: System.Reflection.AssemblyProductAttribute("RestaurantSys.ConsoleRunner")]
 [assembly: System.Reflection.AssemblyTitleAttribute("RestaurantSys.ConsoleRunner")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

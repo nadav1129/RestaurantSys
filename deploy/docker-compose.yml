@@ -1,4 +1,3 @@
-version: "3.9"
 
 services:
   db:
@@ -29,6 +28,8 @@ services:
       timeout: 3s
       retries: 30
 
+
+     
   api:
     image: mcr.microsoft.com/dotnet/sdk:9.0
     container_name: rsys_api
@@ -41,7 +42,6 @@ services:
       # API talks to DB by service name + container port
       POSTGRES_CONNECTION: Host=db;Port=5432;Username=postgres;Password=postgres;Database=postgres
       DOTNET_USE_POLLING_FILE_WATCHER: "1"
-      # optional app settings you referenced earlier
       Rabbit__Host: rabbit
       AllowedCors__0: "http://localhost:5173"
       AllowedCors__1: "http://host.docker.internal:5173"
@@ -57,6 +57,24 @@ services:
       rabbit:
         condition: service_healthy
 
+  whatsapp-webhook:
+    build:
+      context: ../backend
+      dockerfile: ./integrations/WhatsAppShiftBot/Dockerfile
+    container_name: rsys_whatsapp_webhook
+    depends_on:
+      - db
+      - api
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      DB: "Host=db;Port=5432;Username=postgres;Password=postgres;Database=postgres"
+      ManagementApi__BaseUrl: "http://api:8080"
+      OpenAI__ApiKey: "${OPENAI_API_KEY}"
+      OpenAI__Model: "gpt-4.1-mini"
+      WhatsApp__VerifyToken: "${WHATSAPP_VERIFY_TOKEN}"
+    ports:
+      - "8081:8082"
+
   web:
     image: node:20-alpine
     container_name: rsys_web
@@ -65,7 +83,6 @@ services:
     environment:
       CHOKIDAR_USEPOLLING: "true"
       HOST: "0.0.0.0"
-      # or use Vite proxy in your project; this env var is optional
       VITE_API_BASE: "http://localhost:8080"
     volumes:
       - ../front/restaurant-ui:/app:rw
@@ -74,6 +91,12 @@ services:
       - "5173:5173"
     depends_on:
       - api
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    depends_on:
+      - whatsapp-webhook
+    command: tunnel --no-autoupdate --url http://whatsapp-webhook:8082
 
 volumes:
   pgdata:

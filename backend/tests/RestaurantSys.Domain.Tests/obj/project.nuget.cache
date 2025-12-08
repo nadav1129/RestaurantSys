@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "enKxh+Iy96c=",
+  "dgSpecHash": "xkUni8ePD5U=",
   "success": true,
-  "projectFilePath": "C:\\Projects\\RestaurantSys\\tests\\RestaurantSys.Domain.Tests\\RestaurantSys.Domain.Tests.csproj",
+  "projectFilePath": "C:\\Projects\\RestaurantSys\\backend\\tests\\RestaurantSys.Domain.Tests\\RestaurantSys.Domain.Tests.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\nadi1\\.nuget\\packages\\coverlet.collector\\6.0.0\\coverlet.collector.6.0.0.nupkg.sha512",
     "C:\\Users\\nadi1\\.nuget\\packages\\microsoft.codecoverage\\17.8.0\\microsoft.codecoverage.17.8.0.nupkg.sha512",
