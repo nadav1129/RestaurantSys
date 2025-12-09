@@ -1,15 +1,16 @@
 # Global ignore patterns for whole project
 # =========================================
-echo **/appsettings.Development.json>>.gitignore
-echo **/appsettings.Local.json>>.gitignore
-echo .env.*>>.gitignore
+
+# App settings that contain secrets / local config
+**/appsettings.Development.json
+**/appsettings.Local.json
 
 # IDE caches
 .vs/
 .vscode/
 .idea/
 
-# .NET
+# .NET build output (fallback if backend/.gitignore isn't applied)
 bin/
 obj/
 
@@ -27,22 +28,10 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
-**/.docker/
-**/.dockerignore
 deploy/postgres-data/
 pgdata/
 db-data/
 
-
-
 # Logs
 *.log
 logs/
-*.v2
-.vs/RestaurantSys/DesignTimeBuild/.dtbcache.v2
-.vs/RestaurantSys/FileContentIndex/754e1981-e8ad-4bd1-b6b3-4341dd9774b8.vsidx
-.vs/RestaurantSys/CopilotIndices/17.14.670.39694/CodeChunks.db
-.vs/RestaurantSys/CopilotIndices/17.14.670.39694/SemanticSymbols.db
-.vs/RestaurantSys/CopilotIndices/17.14.670.39694/SemanticSymbols.db
-.vs/RestaurantSys/CopilotIndices/17.14.670.39694/CodeChunks.db
-.vs/

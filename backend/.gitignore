@@ -6,6 +6,7 @@ obj/
 *.cache/
 *.ide/
 *.db
+TestResults/
 
 # Rider / VS Code
 .idea/
