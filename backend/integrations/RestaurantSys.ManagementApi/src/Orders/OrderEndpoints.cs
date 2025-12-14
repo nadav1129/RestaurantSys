@@ -7,10 +7,210 @@ public static class OrderEndpoints
 {
     public static void MapOrderEndpoints(this WebApplication app)
     {
+
+        /* =========================================
+   POST /api/orders/confirm
+   One-shot endpoint used by OrderPage:
+
+   Body:
+   {
+     shiftId: string,
+     table: string,                // "none" for quick orders (no table)
+     guestName?: string,
+     guestPhone?: string,
+     dinersCount?: number,
+     note?: string,
+     items: [
+       {
+         productId: string,
+         name: string,             // optional on server
+         qty: number,
+         unitPrice: number,        // in shekels
+         additions: string[],      // ignored for now
+         notes?: string            // ignored for now
+       }
+     ]
+   }
+
+   Behaviour (single transaction):
+   - Find or create an open order for (shiftId, table_id[NULL for now])
+   - Insert order_items rows for each item
+   - (Later: also fan out to checker / bar queues)
+   ========================================= */
+
+        app.MapPost("/api/orders/confirm", async (HttpRequest req, NpgsqlDataSource db) =>
+        {
+            try
+            {
+                var body = await JsonSerializer.DeserializeAsync<JsonElement>(req.Body);
+                if (body.ValueKind != JsonValueKind.Object)
+                    return Results.BadRequest(new { error = "Invalid JSON." });
+
+                // === 1) Basic fields from body ===
+
+                if (!TryGetGuid(body, "shiftId", out var shiftId) || shiftId == Guid.Empty)
+                    return Results.BadRequest(new { error = "shiftId is required." });
+
+                // For now we are not resolving "table" (text) -> tables.table_id.
+                // Quick orders send "none", real table flow will later send a proper tableId.
+                var tableString = GetString(body, "table");
+                Guid? tableId = null;
+                if (TryGetGuid(body, "tableId", out var tId) && tId != Guid.Empty)
+                    tableId = tId;
+
+                var guestName = GetString(body, "guestName");
+                var guestPhone = GetString(body, "guestPhone");
+                var dinersCount = GetInt(body, "dinersCount");
+                var note = GetString(body, "note");
+
+                if (!body.TryGetProperty("items", out var itemsEl) ||
+                    itemsEl.ValueKind != JsonValueKind.Array ||
+                    itemsEl.GetArrayLength() == 0)
+                {
+                    return Results.BadRequest(new { error = "items is required and must be a non-empty array." });
+                }
+
+                // === 2) Work in a single DB connection + transaction ===
+
+                await using var conn = await db.OpenConnectionAsync();
+                await using var tx = await conn.BeginTransactionAsync();
+
+                Guid orderId;
+
+                // 2a) Try to find an existing open order for this (shiftId, tableId)
+                const string findSql = @"
+                    select order_id
+                    from orders
+                    where shift_id = @shift_id
+                      and table_id is not distinct from @table_id
+                      and status = 'open'
+                    limit 1;
+                ";
+
+                await using (var findCmd = new NpgsqlCommand(findSql, conn, tx))
+                {
+                    findCmd.Parameters.AddWithValue("shift_id", shiftId);
+                    findCmd.Parameters.AddWithValue("table_id", (object?)tableId ?? DBNull.Value);
+
+                    await using var reader = await findCmd.ExecuteReaderAsync();
+                    if (await reader.ReadAsync())
+                    {
+                        orderId = reader.GetGuid(0);
+                    }
+                    else
+                    {
+                        // 2b) No open order yet => create one
+                        const string insertSql = @"
+                            insert into orders
+                              (shift_id, table_id, opened_by_worker_id, source, status,
+                               opened_at, guest_name, guest_phone, diners_count, note)
+                            values
+                              (@shift_id, @table_id, null, 'table', 'open',
+                               now(), @guest_name, @guest_phone, @diners_count, @note)
+                            returning order_id;
+                        ";
+
+                        await reader.DisposeAsync(); // just to be safe before reusing connection
+
+                        await using var insertCmd = new NpgsqlCommand(insertSql, conn, tx);
+                        insertCmd.Parameters.AddWithValue("shift_id", shiftId);
+                        insertCmd.Parameters.AddWithValue("table_id", (object?)tableId ?? DBNull.Value);
+                        insertCmd.Parameters.AddWithValue("guest_name", (object?)guestName ?? DBNull.Value);
+                        insertCmd.Parameters.AddWithValue("guest_phone", (object?)guestPhone ?? DBNull.Value);
+                        insertCmd.Parameters.AddWithValue("diners_count", (object?)dinersCount ?? DBNull.Value);
+                        insertCmd.Parameters.AddWithValue("note", (object?)note ?? DBNull.Value);
+
+                        var result = await insertCmd.ExecuteScalarAsync();
+                        if (result is Guid g)
+                        {
+                            orderId = g;
+                        }
+                        else
+                        {
+                            await tx.RollbackAsync();
+                            return Results.Problem("Failed to create order.", statusCode: 500);
+                        }
+                    }
+                }
+
+                // === 3) Insert order_items for each cart line ===
+
+                const string insertItemSql = @"
+                    insert into order_items (order_id, product_id, quantity, price_cents)
+                    values (@order_id, @product_id, @quantity, @price_cents);
+                ";
+
+                foreach (var item in itemsEl.EnumerateArray())
+                {
+                    // productId (required)
+                    if (!TryGetGuid(item, "productId", out var productId) || productId == Guid.Empty)
+                    {
+                        await tx.RollbackAsync();
+                        return Results.BadRequest(new { error = "Each item must have a valid productId." });
+                    }
+
+                    // qty (default 1 if not provided)
+                    int qty = 1;
+                    if (item.TryGetProperty("qty", out var qtyEl) &&
+                        qtyEl.ValueKind == JsonValueKind.Number &&
+                        qtyEl.TryGetInt32(out var q) &&
+                        q > 0)
+                    {
+                        qty = q;
+                    }
+
+                    // unitPrice comes in shekels (from UI) -> convert to cents
+                    int priceCents = 0;
+                    if (item.TryGetProperty("unitPrice", out var priceEl) &&
+                        priceEl.ValueKind == JsonValueKind.Number)
+                    {
+                        // use decimal to avoid float rounding issues
+                        if (priceEl.TryGetDecimal(out var priceDecimal))
+                        {
+                            priceCents = (int)Math.Round(priceDecimal * 100m, MidpointRounding.AwayFromZero);
+                        }
+                    }
+
+                    await using var itemCmd = new NpgsqlCommand(insertItemSql, conn, tx);
+                    itemCmd.Parameters.AddWithValue("order_id", orderId);
+                    itemCmd.Parameters.AddWithValue("product_id", productId);
+                    itemCmd.Parameters.AddWithValue("quantity", qty);
+                    itemCmd.Parameters.AddWithValue("price_cents", priceCents);
+
+                    await itemCmd.ExecuteNonQueryAsync();
+                }
+
+                // === 4) (Future) Router logic goes here ===
+                // For now, CheckerPage can query:
+                //   orders (where status = 'open')
+                //   join order_items
+                //   join products on products.product_id = order_items.product_id
+                //   filter products.type in ('food', ...) to show kitchen items.
+
+                await tx.CommitAsync();
+
+                var obj = new
+                {
+                    OrderId = orderId
+                };
+
+                return Results.Json(
+                    obj,
+                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Error in POST /api/orders/confirm:\n" + ex);
+                return Results.Problem("POST /api/orders/confirm failed", statusCode: 500);
+            }
+        });
+
+
+
         /* =========================================
            GET /api/shifts/{shiftId}/orders
            ========================================= */
-
         app.MapGet("/api/shifts/{shiftId:guid}/orders", async (Guid shiftId, NpgsqlDataSource db) =>
         {
             try
@@ -89,7 +289,6 @@ public static class OrderEndpoints
         /* =========================================
            GET /api/orders/{orderId}
            ========================================= */
-
         app.MapGet("/api/orders/{orderId:guid}", async (Guid orderId, NpgsqlDataSource db) =>
         {
             try
@@ -384,7 +583,89 @@ public static class OrderEndpoints
                 return Results.Problem("PATCH /api/orders/{orderId} failed", statusCode: 500);
             }
         });
+
+        // GET /api/orders/active?shiftId=<guid>&tableId=<guid?>   (tableId is optional)
+        app.MapGet("/api/orders/active", async (HttpRequest req, NpgsqlDataSource db) =>
+        {
+            if (!Guid.TryParse(req.Query["shiftId"], out var shiftId))
+                return Results.BadRequest("shiftId is required and must be a GUID.");
+
+            Guid? tableId = null;
+            if (req.Query.TryGetValue("tableId", out var raw) && Guid.TryParse(raw!, out var tId))
+                tableId = tId;
+
+            try
+            {
+                const string FIND_SQL = @"
+            select o.order_id
+            from orders o
+            where o.shift_id = @shift_id
+              and o.table_id is not distinct from @table_id
+              and o.status = 'open'
+            limit 1;";
+
+                await using var conn = await db.OpenConnectionAsync();
+
+                Guid? orderId = null;
+                await using (var find = new NpgsqlCommand(FIND_SQL, conn))
+                {
+                    find.Parameters.AddWithValue("shift_id", shiftId);
+                    find.Parameters.AddWithValue("table_id", (object?)tableId ?? DBNull.Value);
+                    var res = await find.ExecuteScalarAsync();
+                    if (res is Guid g) orderId = g;
+                }
+
+                if (orderId is null)
+                {
+                    return Results.Json(new { orderId = (Guid?)null, items = Array.Empty<object>() },
+                        new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                }
+
+                const string ITEMS_SQL = @"
+            select
+              oi.product_id,
+              p.name,
+              oi.quantity,
+              oi.price_cents
+            from order_items oi
+            join products p on p.product_id = oi.product_id
+            where oi.order_id = @order_id
+            order by oi.created_at;";
+
+                var items = new List<object>();
+                await using (var itemsCmd = new NpgsqlCommand(ITEMS_SQL, conn))
+                {
+                    itemsCmd.Parameters.AddWithValue("order_id", orderId.Value);
+                    await using var r = await itemsCmd.ExecuteReaderAsync();
+                    while (await r.ReadAsync())
+                    {
+                        items.Add(new
+                        {
+                            productId = r.GetGuid(0),
+                            name = r.GetString(1),
+                            qty = r.GetInt32(2),
+                            unitPrice = r.GetInt32(3) / 100m, // cents -> shekels
+                        });
+                    }
+                }
+
+                return Results.Json(new { orderId, items },
+                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Error in GET /api/orders/active:\n" + ex);
+                return Results.Problem("GET /api/orders/active failed", statusCode: 500);
+            }
+        });
+
+
+
+
     }
+
+
+
 
     /* ==========================
        Small helper methods

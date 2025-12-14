@@ -35,3 +35,4 @@ db-data/
 # Logs
 *.log
 logs/
+deploy/.env

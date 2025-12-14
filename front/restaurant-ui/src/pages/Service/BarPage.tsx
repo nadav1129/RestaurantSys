@@ -4,7 +4,7 @@ import StationServicePage from "../StationServicePage";
 import { apiFetch } from "../../api/api";
 import type { Station, TableInfo, InventoryItem } from "../../types/";
 
-/* For now: still mock inventory until we have a real inventory endpoint */
+/* Still mocked until you have a real inventory endpoint */
 const mockInv: InventoryItem[] = [
   { id: "gin", name: "Gin", qty: 4 },
   { id: "vodka", name: "Vodka", qty: 6 },
@@ -14,7 +14,7 @@ const mockInv: InventoryItem[] = [
 
 type BarPageProps = {
   station: Station;
-  onOpenOrderForTable: (tableId: string) => void;
+  onOpenOrderForTable: (tableNum: string) => void; /* required */
 };
 
 export default function BarPage({ station, onOpenOrderForTable }: BarPageProps) {
@@ -31,6 +31,7 @@ export default function BarPage({ station, onOpenOrderForTable }: BarPageProps) 
         setError(null);
 
         // Backend: GET /api/stations/{stationId}/tables
+        // Expected DTO: { tableId: string; tableNum: number }[]
         const data = (await apiFetch(
           `/api/stations/${station.stationId}/tables`,
           { method: "GET" }
@@ -38,11 +39,12 @@ export default function BarPage({ station, onOpenOrderForTable }: BarPageProps) 
 
         if (cancelled) return;
 
+        // Use the TABLE NUMBER as TableInfo.id so clicking can just pass id
         const mapped: TableInfo[] =
           data?.map((t) => ({
-            id: t.tableId,                // backend table_id
-            owner: `Table ${t.tableNum}`, // label for UI
-            total: 0,                     // will be filled when we hook orders
+            id: String(t.tableNum),      /* <- this is the table number */
+            owner: `Table ${t.tableNum}`,
+            total: 0,
           })) ?? [];
 
         setTables(mapped);
@@ -59,8 +61,44 @@ export default function BarPage({ station, onOpenOrderForTable }: BarPageProps) 
     };
   }, [station.stationId]);
 
+  /** Normalize whatever StationServicePage passes to a table number string */
+  function handleOpen(payload: unknown) {
+    // Most correct case: StationServicePage calls with table.id (already tableNum as string)
+    if (typeof payload === "string" && payload.trim() !== "") {
+      persistAndForward(payload);
+      return;
+    }
+
+    // If StationServicePage sends the whole table object
+    if (payload && typeof payload === "object") {
+      const t = payload as any;
+      // Try common fields in order
+      if (typeof t.id === "string" && t.id.trim() !== "") {
+        persistAndForward(t.id);
+        return;
+      }
+      if (typeof t.tableNum === "number" || typeof t.tableNum === "string") {
+        persistAndForward(String(t.tableNum));
+        return;
+      }
+      if (typeof t.owner === "string") {
+        const match = t.owner.match(/\d+/); // e.g., "Table 12" -> "12"
+        if (match) {
+          persistAndForward(match[0]);
+          return;
+        }
+      }
+    }
+
+    console.warn("[BarPage] Could not resolve table number from click payload:", payload);
+  }
+
+  function persistAndForward(num: string) {
+    try { sessionStorage.setItem("lastTableNum", num); } catch {}
+    onOpenOrderForTable(num);
+  }
+
   if (error) {
-    // optional: show it in UI instead of just logging
     console.warn("BarPage tables error:", error);
   }
 
@@ -69,7 +107,8 @@ export default function BarPage({ station, onOpenOrderForTable }: BarPageProps) 
       station={station}
       tables={tables}
       inventory={mockInv}
-      onOpenOrderForTable={onOpenOrderForTable}
+      // IMPORTANT: we pass our defensive wrapper
+      onOpenOrderForTable={handleOpen}
     />
   );
 }

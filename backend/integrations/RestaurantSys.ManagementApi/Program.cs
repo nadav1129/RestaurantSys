@@ -138,6 +138,7 @@ app.MapTableStationsEndpoints();
 //Stations
 app.MapStationsEndpoints();
 app.MapListEndpoints();
+app.MapCheckerEndpoints();
 
 // Shifts
 app.MapShiftEndpoints();

@@ -1,4 +1,4 @@
-// File: src/pages/ServicePage.tsx
+// src/pages/ServicePage.tsx
 import { useEffect, useMemo, useState } from "react";
 import SecondaryBar from "../../components/SecondaryBar";
 import BarPage from "./BarPage";
@@ -10,16 +10,15 @@ import type { Station } from "../../types/index";
 
 /* ===== Backend DTO ===== */
 
-
 export default function ServicePage({
   /* keep props for compatibility, but we’ll load from API */
   activeStationId,
   onStationChange,
-  onOpenOrderForTable,
+  onOpenOrderForTable, /* <- parent provides this, we forward to table-based stations */
 }: {
   activeStationId?: string;
   onStationChange?: (id: string) => void;
-  onOpenOrderForTable: (tableId: string) => void;
+  onOpenOrderForTable: (tableNum: string) => void;
 }) {
   const [stations, setStations] = useState<Station[]>([]);
   const [activeId, setActiveId] = useState<string | undefined>(activeStationId);
@@ -34,7 +33,7 @@ export default function ServicePage({
           method: "GET",
         })) as Station[] | null;
         setStations(data ?? []);
-        // set default active if none selected
+        /* set default active if none selected */
         if (!activeStationId && (data?.length ?? 0) > 0) {
           setActiveId(data![0].stationId);
         }
@@ -90,16 +89,18 @@ export default function ServicePage({
     switch (activeStation.stationType) {
       case "Bar":
       case "Floor":
-        return <BarPage
-        station={activeStation}                
-        onOpenOrderForTable={onOpenOrderForTable}
-    />
+        return (
+          <BarPage
+            station={activeStation}
+            onOpenOrderForTable={onOpenOrderForTable}
+          />
+        );
       case "Hostes":
       case "selector":
         return <HostessPage stationId={activeStation.stationId} />;
       case "Checker":
         return <CheckerPage />;
-      // map the rest to placeholders for now
+      /* placeholders for the rest */
       case "Kitchen":
       case "Storage":
       case "Managment":

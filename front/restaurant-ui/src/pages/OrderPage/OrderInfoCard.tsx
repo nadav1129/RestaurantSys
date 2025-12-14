@@ -3,12 +3,18 @@ import Button from "../../components/Button";
 
 function formatTime(d: Date | null): string {
   if (!d) return "--:--";
-  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 type OrderInfoCardProps = {
   table: string;
   setTable: (value: string) => void;
+
+  tableId: string | null;
+  setTableId: (value: string | null) => void;
 
   guestName: string;
   setGuestName: (value: string) => void;
@@ -22,7 +28,7 @@ type OrderInfoCardProps = {
   note: string;
   setNote: (value: string) => void;
 
-  startTime: Date;
+  startTime: Date | null;
   endTime: Date | null;
 
   minimum: number;
@@ -30,7 +36,6 @@ type OrderInfoCardProps = {
   totalWith10: number;
   only10: number;
 
-  orderConfirmed: boolean;
   onTopButtonClick: () => void;
   hasItems: boolean;
 };
@@ -38,6 +43,8 @@ type OrderInfoCardProps = {
 export default function OrderInfoCard({
   table,
   setTable,
+  tableId,
+  setTableId,
   guestName,
   setGuestName,
   diners,
@@ -52,7 +59,6 @@ export default function OrderInfoCard({
   total,
   totalWith10,
   only10,
-  orderConfirmed,
   onTopButtonClick,
   hasItems,
 }: OrderInfoCardProps) {
@@ -90,6 +96,16 @@ export default function OrderInfoCard({
                 value={table}
                 onChange={(e) => setTable(e.target.value)}
                 placeholder="none"
+              />
+              <input
+                className="w-[22rem] max-w-[50vw] rounded-xl border border-gray-300 px-3 py-1 text-xs"
+                value={tableId ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value.trim();
+                  setTableId(v.length ? v : null);
+                }}
+                placeholder="tableId (GUID)"
+                title="Real tableId (GUID). Used for persisting the open order."
               />
             </div>
 
@@ -182,7 +198,7 @@ export default function OrderInfoCard({
               </Button>
               <Button
                 onClick={onTopButtonClick}
-                disabled={!hasItems || !orderConfirmed}
+                disabled={!hasItems}
                 className="flex-1 justify-center"
               >
                 Pay Now
@@ -196,10 +212,14 @@ export default function OrderInfoCard({
       {showGuestEditor && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-lg">
-            <div className="mb-3 text-sm font-semibold text-gray-800">Guest details</div>
+            <div className="mb-3 text-sm font-semibold text-gray-800">
+              Guest details
+            </div>
             <div className="mb-3 flex flex-col gap-2">
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-600">Name</label>
+                <label className="text-xs font-medium text-gray-600">
+                  Name
+                </label>
                 <input
                   className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
                   value={tempName}
@@ -208,7 +228,9 @@ export default function OrderInfoCard({
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-600">Phone</label>
+                <label className="text-xs font-medium text-gray-600">
+                  Phone
+                </label>
                 <input
                   className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
                   value={tempPhone}

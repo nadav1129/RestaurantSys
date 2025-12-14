@@ -474,4 +474,22 @@ namespace RestaurantSys.Api
         [JsonPropertyName("endedAt")]
         public DateTimeOffset EndedAt { get; init; }
     }
+
+    public sealed class CheckerMealDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public int Qty { get; set; }
+        public int Done { get; set; }
+        public bool Verified { get; set; }
+    }
+
+    public sealed class CheckerOrderDto
+    {
+        public Guid Id { get; set; }
+        public string Table { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+        public List<CheckerMealDto> Meals { get; set; } = new();
+    }
+
 }

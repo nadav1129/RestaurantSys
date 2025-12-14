@@ -1,263 +1,184 @@
+// src/pages/OrderPage/OrderPage.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import Button from "../../components/Button";
 import { apiFetch } from "../../api/api";
 import OrderInfoCard from "./OrderInfoCard";
+import OrderMenu from "./OrderMenu";
+import ItemDetails from "./ItemDetails";
+import OrderItems from "./OrderItems";
 
-/* =========================
-   Types
-========================= */
-
-// UI product model (used at leaf nodes)
-type ProductItem = {
+/* ===== Types ===== */
+export type ProductItem = {
   id: string;
   name: string;
   type: string;
-  price: number | null; // shekels (mapped from backend cents) or null
+  price: number | null; // ₪
 };
 
-// UI menu node
-type MenuNode = {
+export type MenuNode = {
   id: string;
   name: string;
-  isLeaf?: boolean; // may be unreliable from backend; we also infer via children
+  isLeaf?: boolean;
   children?: MenuNode[];
-  products?: ProductItem[]; // populated when we enter a leaf and fetch products
+  products?: ProductItem[];
 };
 
-type CartItem = {
-  id: string; // product id
+export type CartItem = {
+  id: string;
   name: string;
   qty: number;
-  price: number /* unit price actually charged */;
+  price: number; // unit price ₪
   additions: string[];
   notes?: string;
+  status: "pending" | "confirmed";
 };
 
-// Backend DTOs
-type SettingsDto = { activeMenuNum: number | null; globalDiscountPct: number };
-
-// This matches your /api/menu-nodes response (children of root)
-type ApiNode = {
-  id: string;
-  parentId: string | null;
-  name: string;
-  isLeaf: boolean; // may not be trustworthy; we still infer from children
-  children?: ApiNode[];
+type ShiftDto = { shiftId: string; openedAt: string };
+type SettingsDto = {
+  activeMenuNum: number | null;
+  globalDiscountPct?: number | null;
 };
 
-type ShiftDto = {
-  shiftId: string;
-  status: "planned" | "active" | "closed" | "cancelled" | string;
-  startedAt?: string | null;
-  endedAt?: string | null;
-  name?: string | null;
+type OrderPageProps = {
+  initialTableNum?: string | null;
+  initialTableId?: string | null;
 };
 
-/* =========================
-   Helpers
-========================= */
-
-// IMPORTANT: only treat explicit true as leaf.
-// If backend sends isLeaf: false for real leaves, we still infer by children.
-function isLeaf(node: MenuNode): boolean {
-  if (node.isLeaf === true) return true; // explicit true
-  if (node.products && node.products.length > 0) return true; // we already have products
-  return !node.children || node.children.length === 0; // no children -> leaf
-}
-
-// Map ApiNode -> MenuNode (categories only in this endpoint)
-function mapCategory(n: ApiNode): MenuNode {
-  return {
-    id: n.id,
-    name: n.name,
-    isLeaf: n.isLeaf,
-    children: n.children?.map(mapCategory),
-  };
-}
-
-function arrayEq(a: string[], b: string[]) {
-  if (a.length !== b.length) return false;
-  const sa = [...a].sort();
-  const sb = [...b].sort();
-  return sa.every((x, i) => x === sb[i]);
-}
-
-// Compose a draft payload once
-function buildOrderDraft({
-  table,
-  guestName,
-  phone,
-  diners,
-  note,
-  cart,
-}: {
-  table: string;
-  guestName: string;
-  phone: string;
-  diners: string;
-  note: string;
-  cart: CartItem[];
-}) {
-  return {
-    table: table || "none",
-    guestName: guestName || null,
-    guestPhone: phone || null,
-    dinersCount: diners ? Number(diners) || null : null,
-    note: note || null,
-    items: cart.map((c) => ({
-      productId: c.id,
-      name: c.name,
-      qty: c.qty,
-      unitPrice: c.price,
-      additions: c.additions,
-      notes: c.notes ?? null,
-      lineTotal: c.qty * c.price,
-    })),
-    // future: station hints for routing, eg: "checker" | "bar"
-    stations: ["checker", "bar"],
-  };
-}
-
-/* =========================
-   Page
-========================= */
-export default function OrderPage() {
-  // “Quick order” table default is none
-  const [table, setTable] = useState<string>("none");
-
-  // Reservation / guest fields
-  const [guestName, setGuestName] = useState<string>("");
-  const [diners, setDiners] = useState<string>("");
-  const [phone, setPhone] = useState<string>("");
-  const [note, setNote] = useState<string>("");
-
-  // Fixed time fields
-  const [startTime] = useState<Date>(() => new Date());
+export default function OrderPage({
+  initialTableNum = null,
+  initialTableId = null,
+}: OrderPageProps) {
+  /* Header fields */
+  const [table, setTable] = useState<string>("");
+  const [tableId, setTableId] = useState<string | null>(null);
+  const [guestName, setGuestName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [diners, setDiners] = useState("");
+  const [note, setNote] = useState("");
+  const [startTime, setStartTime] = useState<Date | null>(new Date());
   const [endTime, setEndTime] = useState<Date | null>(null);
 
-  // Order/cart
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [orderConfirmed, setOrderConfirmed] = useState<boolean>(false);
+  /* Shift + settings */
+  const [activeShift, setActiveShift] = useState<ShiftDto | null>(null);
+  const [settings, setSettings] = useState<SettingsDto | null>(null);
 
-  // menu + settings
-  const [discountPct, setDiscountPct] = useState<number>(0);
-  const [root, setRoot] = useState<MenuNode | null>(null);
+  /* Menu path */
   const [path, setPath] = useState<MenuNode[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const current = path[path.length - 1] ?? null;
 
-  // View mode: browsing products vs customizing a product
-  const [mode, setMode] = useState<"browse" | "customize">("browse");
+  /* Products cache */
+  const productCacheRef = useRef<Map<string, ProductItem[]>>(new Map());
+
+  /* Cart / order */
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [orderId, setOrderId] = useState<string | null>(null);
+
+  /* UI mode */
+  const [mode, setMode] = useState<"browse" | "details">("browse");
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(
     null
   );
 
-  // Customization state
+  /* Customization for ItemDetails */
   const [customQty, setCustomQty] = useState<number>(1);
   const [customNotes, setCustomNotes] = useState<string>("");
   const [customAdds, setCustomAdds] = useState<string[]>([]);
 
-  // Keep track of which nodeIds we've already fetched products for
-  const fetchedNodeIds = useRef<Set<string>>(new Set());
+  /* Totals */
+  const subtotal = cart.reduce((s, c) => s + c.qty * c.price, 0);
+  const total = subtotal;
+  const only10 = Math.round(total * 0.1);
+  const totalWith10 = total + only10;
+  const minimum = total;
 
-  // Cache of nodeId -> products so re-entering a category restores its products instantly
-  const productCacheRef = useRef<Map<string, ProductItem[]>>(new Map());
-  const [activeShift, setActiveShift] = useState<ShiftDto | null>(null);
-  const [shiftError, setShiftError] = useState<string | null>(null);
+  /* ===== Init from parent ===== */
+  useEffect(() => {
+    // Prefer prop; otherwise fall back to the last click we saved
+    if (initialTableNum != null && initialTableNum !== "") {
+      setTable(String(initialTableNum));
+    } else {
+      try {
+        const t = sessionStorage.getItem("lastTableNum");
+        if (t && t !== "") setTable(t);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (initialTableId != null) setTableId(initialTableId);
+  }, [initialTableNum, initialTableId]);
 
+  /* ===== Load shift & settings ===== */
   useEffect(() => {
     (async () => {
       try {
-        setShiftError(null);
         const s = await apiFetch<ShiftDto | null>("/api/shifts/active");
         setActiveShift(s ?? null);
       } catch (e) {
-        console.error("Failed to load active shift", e);
-        setShiftError("No active shift. Start one in Dashboard.");
+        console.error("Active shift load failed", e);
+      }
+    })();
+
+    (async () => {
+      try {
+        const set = await apiFetch<SettingsDto | null>("/api/settings");
+        setSettings(set ?? null);
+      } catch (e) {
+        console.error("Settings load failed", e);
       }
     })();
   }, []);
 
-  // Reset confirmation when cart is cleared
+  /* ===== Load top-level menu (fake root) ===== */
   useEffect(() => {
-    if (cart.length === 0) {
-      setOrderConfirmed(false);
-      setEndTime(null);
-    }
-  }, [cart.length]);
-
-  // load active settings + selected menu tree (correct endpoint)
-  useEffect(() => {
-    let cancelled = false;
     (async () => {
-      setLoading(true);
-      setError(null);
       try {
-        // 1) read current settings (active menu + discount)
-        const s = (await apiFetch("/api/settings")) as SettingsDto;
-        const active = s?.activeMenuNum ?? null;
-        const disc =
-          typeof s?.globalDiscountPct === "number" ? s.globalDiscountPct : 0;
+        const active = settings?.activeMenuNum ?? null;
+        if (active == null) return;
 
-        if (active == null) {
-          if (!cancelled) {
-            setDiscountPct(disc);
-            setRoot(null);
-            setPath([]);
-            setError("No active menu selected. Set it in Management Settings.");
-          }
-          return;
-        }
-
-        // 2) load the tree: backend returns children[] of root
-        const arr = (await apiFetch(
+        const children = await apiFetch<any[]>(
           `/api/menu-nodes?menu=${active}`
-        )) as ApiNode[];
+        );
 
-        // Wrap server's children[] into a fake root
+        const mapCategory = (n: any): MenuNode => ({
+          id: n.id,
+          name: n.name,
+          isLeaf: !!n.isLeaf,
+          children: (n.children ?? []).map(mapCategory),
+        });
+
         const fakeRoot: MenuNode = {
           id: "root",
           name: "Menu",
           isLeaf: false,
-          children: (arr ?? []).map(mapCategory),
+          children: (children ?? []).map(mapCategory),
         };
 
-        if (!cancelled) {
-          setDiscountPct(disc);
-          setRoot(fakeRoot);
-          setPath([fakeRoot]);
-        }
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || "Failed to load menu.");
-      } finally {
-        if (!cancelled) setLoading(false);
+        setPath([fakeRoot]);
+      } catch (e) {
+        console.error("Menu categories load failed", e);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  }, [settings?.activeMenuNum]);
 
-  const current = path[path.length - 1] ?? null;
-  const parent = path.length > 1 ? path[path.length - 2] : null;
-
+  /* ===== Fetch products when at a leaf ===== */
   useEffect(() => {
     if (!current) return;
 
-    // Only consider nodes that look like leaves (no children or explicitly leaf)
-    if (!isLeaf(current)) return;
+    const looksLeaf =
+      current.isLeaf === true ||
+      !current.children ||
+      current.children.length === 0;
 
-    // If node already has products on it, we’re done
+    if (!looksLeaf) return;
+
+    // already have products?
     if (Array.isArray(current.products)) return;
 
-    // If we’ve fetched before, hydrate from cache and stop
+    // cached?
     const cached = productCacheRef.current.get(current.id);
     if (cached) {
       setPath((prev) => {
-        if (prev.length === 0) return prev;
         const next = prev.slice();
-        const i = next.length - 1;
-        next[i] = { ...next[i], products: cached, isLeaf: true };
+        next[next.length - 1] = { ...current, products: cached, isLeaf: true };
         return next;
       });
       return;
@@ -265,122 +186,61 @@ export default function OrderPage() {
 
     (async () => {
       try {
-        const arr = (await apiFetch(
+        const arr = await apiFetch<ProductItem[]>(
           `/api/menu-nodes/${current.id}/products`
-        )) as Array<{
-          id: string;
-          name: string;
-          type: string;
-          price: number | null;
-        }>;
-
-        // Map backend cents -> UI shekels (remove /100 if already in shekels)
-        const mapped: ProductItem[] = (arr ?? []).map((x) => ({
-          id: x.id,
-          name: x.name,
-          type: x.type,
-          price: (x.price ?? 0) / 100,
-        }));
-
-        // Cache it
-        productCacheRef.current.set(current.id, mapped);
-
-        // 1) Update the node in the current path
+        );
+        productCacheRef.current.set(current.id, arr ?? []);
         setPath((prev) => {
-          if (prev.length === 0) return prev;
           const next = prev.slice();
-          const i = next.length - 1;
-          next[i] = { ...next[i], products: mapped, isLeaf: true };
+          next[next.length - 1] = {
+            ...current,
+            products: arr ?? [],
+            isLeaf: true,
+          };
           return next;
         });
-
-        // 2) Also update the node inside the tree (so parent.children holds hydrated child)
-        setRoot((prev) => {
-          if (!prev) return prev;
-
-          const apply = (n: MenuNode): MenuNode => {
-            if (n.id === current.id) {
-              return { ...n, products: mapped, isLeaf: true };
-            }
-            if (!n.children || n.children.length === 0) return n;
-            let changed = false;
-            const children = n.children.map((c) => {
-              const cc = apply(c);
-              if (cc !== c) changed = true;
-              return cc;
-            });
-            return changed ? { ...n, children } : n;
-          };
-
-          return apply(prev);
-        });
-      } catch {
-        // Optionally set an error banner
-        // setError("Failed to load products for this category.");
+      } catch (e) {
+        console.error("Products load failed for", current.id, e);
       }
     })();
-  }, [current?.id]);
+  }, [current?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // If at leaf: show its products (or whenever we have products)
-  const currentProducts = useMemo(() => {
-    if (!current) return [];
-    if (Array.isArray(current.products)) return current.products;
-    return isLeaf(current) ? [] : [];
-  }, [current]);
+  /* ===== Derived ===== */
+  const products = useMemo<ProductItem[]>(
+    () => current?.products ?? [],
+    [current?.products]
+  );
 
-  // Totals
-  const subtotal = cart.reduce((s, c) => s + c.qty * c.price, 0);
-  const total = subtotal; // raw total (no service)
-  const only10 = Math.round(total * 0.1);
-  const totalWith10 = total + only10;
-  const minimum = total; // TODO: wire real minimum from settings if/when you have it
-
-  /* -------- Category navigation -------- */
+  /* ===== Navigation handlers ===== */
   const enterNode = (node: MenuNode) => setPath((p) => [...p, node]);
   const goUpOne = () => {
     if (path.length > 1) setPath((p) => p.slice(0, p.length - 1));
   };
 
-  /* -------- Product selection / customization -------- */
-  const openCustomize = (p: ProductItem) => {
+  /* ===== Product selection ===== */
+  const onPickProduct = (p: ProductItem) => {
     setSelectedProduct(p);
     setCustomQty(1);
     setCustomNotes("");
     setCustomAdds([]);
-    setMode("customize");
+    setMode("details");
   };
 
-  const confirmAddToOrder = () => {
+  const addToCart = () => {
     if (!selectedProduct) return;
-    const { id, name } = selectedProduct;
-    const unitPrice = selectedProduct.price ?? 0; // guard null
-    const additions = customAdds.slice();
-
-    setCart((prev) => {
-      const i = prev.findIndex(
-        (c) =>
-          c.id === id &&
-          c.notes === customNotes &&
-          arrayEq(c.additions, additions)
-      );
-      if (i >= 0) {
-        const next = prev.slice();
-        next[i] = { ...next[i], qty: next[i].qty + customQty };
-        return next;
-      }
-      return [
-        ...prev,
-        {
-          id,
-          name,
-          qty: customQty,
-          price: unitPrice,
-          additions,
-          notes: customNotes,
-        },
-      ];
-    });
-
+    const unit = selectedProduct.price ?? 0;
+    setCart((prev) => [
+      ...prev,
+      {
+        id: selectedProduct.id,
+        name: selectedProduct.name,
+        qty: customQty,
+        price: unit,
+        additions: customAdds.slice(),
+        notes: customNotes || undefined,
+        status: "pending",
+      },
+    ]);
     setMode("browse");
     setSelectedProduct(null);
   };
@@ -388,76 +248,116 @@ export default function OrderPage() {
   const removeCartItem = (index: number) =>
     setCart((prev) => prev.filter((_, i) => i !== index));
 
-  const handleTopButtonClick = async () => {
-  if (cart.length === 0) return;
-
-  if (!orderConfirmed) {
-    setOrderConfirmed(true);
-    return;
-  }
-
-  // must have active shift
-  if (!activeShift || activeShift.status !== "active") {
-    alert("No active shift. Start a shift in Dashboard first.");
-    return;
-  }
-
-  try {
-    const body = {
-      shiftId: activeShift.shiftId,  // ✅ now a GUID
-      tableId: null,
-      openedByWorkerId: null,
-      source: "table",
-      guestName: guestName || null,
-      guestPhone: phone || null,
-      dinersCount: diners ? Number(diners) || null : null,
-      note: note || null,
-      minSpendCents: null
-    };
-
-    const created = await apiFetch("/api/orders", {
-      method: "POST",
-      body
-    });
-
-      // (Optional) You can also PATCH with totals once you compute them server-side.
-      // await apiFetch(`/api/orders/${created.orderId}`, {
-      //   method: "PATCH",
-      //   body: {
-      //     totalBeforeTipCents: Math.round(total * 100),
-      //     tipCents: Math.round(total * 10), // if you want to persist 10% here
-      //     totalCents: Math.round(totalWith10 * 100),
-      //     paymentStatus: "paid",
-      //     status: "closed"
-      //   }
-      // });
-
-      // local UI close-out
-      const now = new Date();
-      setEndTime(now);
-      alert(`Paid ₪${totalWith10} (Total ₪${total}, Tip ₪${only10})`);
-
-      // clear cart & reset
-      setCart([]);
-      setOrderConfirmed(false);
-      setGuestName("");
-      setPhone("");
-      setDiners("");
-      setNote("");
-    } catch (e: any) {
-      alert(e?.message || "Failed to save order.");
+  /* ===== Confirm / Pay ===== */
+  const confirmOrder = async () => {
+    if (!activeShift?.shiftId) {
+      alert("No active shift.");
+      return;
+    }
+    const pending = cart.filter((x) => x.status !== "confirmed");
+    if (!pending.length) {
+      alert("No items to confirm.");
+      return;
+    }
+    try {
+      const body = {
+        shiftId: activeShift.shiftId,
+        tableNum: table !== "none" ? table : null, // you pass table number
+        tableId,
+        orderId: orderId ?? null,
+        items: pending.map((x) => ({
+          productId: x.id,
+          qty: x.qty,
+          notes: x.notes ?? "",
+          additions: x.additions,
+        })),
+        guestName: guestName || null,
+        phone: phone || null,
+        diners: diners ? Number(diners) : null,
+        note: note || null,
+      };
+      const res = await apiFetch<{ orderId: string }>("/api/orders/confirm", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      setOrderId(res.orderId);
+      setCart((prev) => prev.map((x) => ({ ...x, status: "confirmed" })));
+    } catch (e) {
+      console.error("Confirm failed", e);
+      alert("Confirm failed");
     }
   };
 
-  /* =========================
-     Render
-  ========================= */
+  const payAndClose = async () => {
+    if (!orderId) {
+      alert("Confirm the order first.");
+      return;
+    }
+    setEndTime(new Date());
+    alert(`Paid ₪${totalWith10} (Total ₪${total}, Tip ₪${only10})`);
+    // reset
+    setCart([]);
+    setOrderId(null);
+    setGuestName("");
+    setPhone("");
+    setDiners("");
+    setNote("");
+  };
+
+  /* ===== RIGHT sidebar (categories) ===== */
+  function CategorySidebar() {
+    if (!path.length) {
+      return (
+        <div className="rounded-2xl ring-1 ring-gray-200 bg-white p-4 shadow-sm text-sm text-gray-500">
+          No menu.
+        </div>
+      );
+    }
+    const node = current!;
+    const children = node?.children ?? [];
+    return (
+      <div className="rounded-2xl ring-1 ring-gray-200 bg-white shadow-sm overflow-hidden">
+        <div className="bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700">
+          {node?.name ?? "Menu"}
+        </div>
+        <div className="p-3">
+          {children.length === 0 ? (
+            <div className="text-xs text-gray-500">No sub-categories.</div>
+          ) : (
+            <ul className="space-y-1">
+              {children.map((c) => (
+                <li key={c.id}>
+                  <button
+                    className="w-full rounded-xl px-3 py-2 text-left ring-1 ring-transparent hover:ring-gray-200 hover:bg-gray-50 transition"
+                    onClick={() => enterNode(c)}
+                  >
+                    {c.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {path.length > 1 && (
+            <button
+              className="mt-3 w-full rounded-xl px-3 py-2 text-sm ring-1 ring-gray-200 hover:bg-gray-50 transition"
+              onClick={goUpOne}
+            >
+              ← Up one
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /* ===== Render (Left items | Center content | Right categories) ===== */
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-4">
-      {/* Top info card */}
       <OrderInfoCard
         table={table}
         setTable={setTable}
+        tableId={tableId}
+        setTableId={setTableId}
         guestName={guestName}
         setGuestName={setGuestName}
         diners={diners}
@@ -466,342 +366,58 @@ export default function OrderPage() {
         setPhone={setPhone}
         note={note}
         setNote={setNote}
-        startTime={startTime}
+        /* If OrderInfoCard expects Date (not nullable), coerce here */
+        startTime={startTime ?? new Date()}
         endTime={endTime}
         minimum={minimum}
         total={total}
         totalWith10={totalWith10}
         only10={only10}
-        orderConfirmed={orderConfirmed}
-        onTopButtonClick={handleTopButtonClick}
-        hasItems={cart.length > 0}
+        onTopButtonClick={payAndClose}
+        hasItems={cart.some((x) => x.status === "confirmed")}
       />
 
-      {/* Main layout: Order list (left) + Content (center) + Category (right) */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(260px,1fr)_minmax(420px,2fr)_minmax(260px,1fr)]">
-        {/* Left: current order list */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="text-sm font-semibold">Order Items</div>
-            <Button
-              variant={orderConfirmed ? "secondary" : "primary"}
-              className="text-xs"
-              disabled={cart.length === 0 || orderConfirmed}
-              onClick={async () => {
-                if (cart.length === 0) return;
-
-                // 1) send draft to router sink (no-op on server for now)
-                try {
-                  const draft = buildOrderDraft({
-                    table,
-                    guestName,
-                    phone,
-                    diners,
-                    note,
-                    cart,
-                  });
-                  await apiFetch("/api/orders/route", {
-                    method: "POST",
-                    body: draft,
-                  });
-                } catch (e) {
-                  // non-fatal for now; you can show a toast if you want
-                  console.warn("route sink failed (ignored for now)", e);
-                }
-
-                // 2) lock UI as confirmed
-                setOrderConfirmed(true);
-              }}
-            >
-              {orderConfirmed ? "Confirmed" : "Confirm"}
-            </Button>
-          </div>
-          {cart.length === 0 ? (
-            <div className="py-8 text-center text-sm text-gray-400">
-              No items yet.
-            </div>
-          ) : (
-            <ul className="space-y-3">
-              {cart.map((c, idx) => (
-                <li
-                  key={`${c.id}-${idx}`}
-                  className="rounded-xl border border-gray-200 p-3"
-                >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="font-medium">
-                        {c.name} × {c.qty}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        ₪{c.price} each · Subtotal ₪{c.qty * c.price}
-                      </div>
-                      {(c.additions.length > 0 || c.notes) && (
-                        <div className="mt-1 text-xs text-gray-600">
-                          {c.additions.length > 0 && (
-                            <div>+ {c.additions.join(", ")}</div>
-                          )}
-                          {c.notes && <div>“{c.notes}”</div>}
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      variant="secondary"
-                      onClick={() => removeCartItem(idx)}
-                      className="text-xs"
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Center: main content area */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          {loading && (
-            <div className="text-sm text-gray-500">Loading menu…</div>
-          )}
-          {!loading && error && (
-            <div className="text-sm text-red-600">{error}</div>
-          )}
-          {!loading && !error && root && (
-            <>
-              {mode === "browse" && (
-                <>
-                  {current ? (
-                    <>
-                      <div className="mb-3 text-sm font-semibold">
-                        {current.name} — Products
-                        {discountPct > 0 && (
-                          <span className="ml-2 text-xs font-normal text-green-700">
-                            ({discountPct}% off applied)
-                          </span>
-                        )}
-                      </div>
-                      <ProductGrid
-                        products={currentProducts}
-                        onPick={openCustomize}
-                      />
-                    </>
-                  ) : (
-                    <div className="text-sm text-gray-500">
-                      Pick a category on the right.
-                    </div>
-                  )}
-                </>
-              )}
-
-              {mode === "customize" && selectedProduct && (
-                <CustomizeProduct
-                  product={selectedProduct}
-                  qty={customQty}
-                  setQty={setCustomQty}
-                  notes={customNotes}
-                  setNotes={setCustomNotes}
-                  adds={customAdds}
-                  toggleAdd={(a) =>
-                    setCustomAdds((prev) =>
-                      prev.includes(a)
-                        ? prev.filter((x) => x !== a)
-                        : [...prev, a]
-                    )
-                  }
-                  onCancel={() => {
-                    setMode("browse");
-                    setSelectedProduct(null);
-                  }}
-                  onConfirm={confirmAddToOrder}
-                />
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Right: Category sidebar with recursive nav */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-0 overflow-hidden">
-          <div className="bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700">
-            {current?.name ?? "Menu"}
-          </div>
-
-          <div className="p-2">
-            {loading ? (
-              <div className="text-xs text-gray-500">Loading…</div>
-            ) : !root ? (
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
-                No menu loaded.
-              </div>
-            ) : current && (current.children?.length ?? 0) > 0 ? (
-              <ul className="space-y-2">
-                {(current.children ?? []).map((child) => (
-                  <li key={child.id}>
-                    <button
-                      onClick={() => enterNode(child)}
-                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-left text-sm hover:border-gray-300 hover:bg-gray-50"
-                    >
-                      {child.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
-                This is a leaf. Products appear in the main area.
-              </div>
-            )}
-          </div>
-
-          {parent && (
-            <button
-              onClick={() => goUpOne()}
-              className="m-2 w-[calc(100%-1rem)] rounded-xl bg-indigo-600 px-4 py-2 text-left text-sm font-medium text-white hover:bg-indigo-700"
-              title="Go up"
-              aria-label="Go up to parent"
-            >
-              ↑ {parent.name}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================
-   Local helpers: ProductGrid & CustomizeProduct
-========================= */
-
-function ProductGrid({
-  products,
-  onPick,
-}: {
-  products: ProductItem[];
-  onPick: (p: ProductItem) => void;
-}) {
-  if (!products || products.length === 0) {
-    return (
-      <div className="text-sm text-gray-500">No products in this category.</div>
-    );
-  }
-  return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-      {products.map((p) => (
-        <button
-          key={p.id}
-          onClick={() => onPick(p)}
-          className="rounded-xl border border-gray-200 bg-white p-3 text-left hover:border-gray-300 hover:bg-gray-50"
-        >
-          <div className="text-sm font-medium text-gray-800">{p.name}</div>
-          <div className="text-xs text-gray-500">₪{p.price ?? 0}</div>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function CustomizeProduct({
-  product,
-  qty,
-  setQty,
-  notes,
-  setNotes,
-  adds,
-  toggleAdd,
-  onCancel,
-  onConfirm,
-}: {
-  product: ProductItem;
-  qty: number;
-  setQty: (n: number) => void;
-  notes: string;
-  setNotes: (s: string) => void;
-  adds: string[];
-  toggleAdd: (a: string) => void;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  // Placeholder until additions are provided by backend
-  const addOptions: string[] = [];
-
-  return (
-    <div className="space-y-4">
-      <div className="text-sm font-semibold">{product.name}</div>
-
-      <div className="flex items-center gap-3">
-        <label className="text-sm text-gray-700">Qty</label>
-        <input
-          type="number"
-          min={1}
-          value={qty}
-          onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
-          className="w-20 rounded-xl border border-gray-300 px-3 py-2 text-sm"
+      {/* EXACT column structure: left | center | right */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(280px,1fr)_minmax(500px,2fr)_minmax(280px,1fr)]">
+        {/* LEFT: Order items */}
+        <OrderItems
+          cart={cart}
+          total={total}
+          totalWith10={totalWith10}
+          only10={only10}
+          onRemove={removeCartItem}
+          onConfirm={confirmOrder}
+          onPay={payAndClose}
+          hasConfirmed={cart.some((c) => c.status === "confirmed")}
         />
-        <div className="text-sm text-gray-700">
-          Unit price: <span className="font-medium">₪{product.price ?? 0}</span>
-        </div>
-        <div className="text-sm text-gray-700">
-          Line total:{" "}
-          <span className="font-semibold">₪{(product.price ?? 0) * qty}</span>
-        </div>
-      </div>
 
-      <div>
-        <div className="mb-2 text-sm font-medium text-gray-700">Additions</div>
-        {addOptions.length === 0 ? (
-          <div className="text-xs text-gray-500">
-            No additions for this product.
-          </div>
+        {/* CENTER: either product grid or item details */}
+        {mode === "details" && selectedProduct ? (
+          <ItemDetails
+            product={selectedProduct}
+            qty={customQty}
+            setQty={setCustomQty}
+            notes={customNotes}
+            setNotes={setCustomNotes}
+            adds={customAdds}
+            setAdds={setCustomAdds}
+            onCancel={() => {
+              setMode("browse");
+              setSelectedProduct(null);
+            }}
+            onAdd={addToCart}
+          />
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {addOptions.map((a: string) => {
-              const selected = adds.includes(a);
-              return (
-                <button
-                  key={a}
-                  type="button"
-                  onClick={() => toggleAdd(a)}
-                  className={`rounded-xl border px-3 py-1 text-xs ${
-                    selected
-                      ? "border-indigo-600 bg-indigo-50 text-indigo-700"
-                      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  {selected ? "✓ " : ""}
-                  {a}
-                </button>
-              );
-            })}
-          </div>
+          <OrderMenu
+            path={path}
+            current={current}
+            products={products}
+            onPickProduct={onPickProduct}
+          />
         )}
-      </div>
 
-      <div>
-        <div className="mb-2 text-sm font-medium text-gray-700">Notes</div>
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          className="w-full rounded-xl border border-gray-300 p-2 text-sm"
-          rows={3}
-          placeholder="No ice, extra lemon…"
-        />
-      </div>
-
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-100"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={onConfirm}
-          className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
-        >
-          Add to Order
-        </button>
+        {/* RIGHT: Category sidebar */}
+        <CategorySidebar />
       </div>
     </div>
   );

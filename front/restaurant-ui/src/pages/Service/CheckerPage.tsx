@@ -1,6 +1,7 @@
 // File: src/pages/CheckerPage.tsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Button from "../../components/Button";
+import { apiFetch } from "../../api/api";"../../api/api"; 
 
 /* One meal line inside an order */
 type MealLine = {
@@ -32,27 +33,6 @@ type ConfirmConfig = {
   onConfirm: () => void;
 };
 
-/* Mock data – later we will replace with API */
-const initialOrders: CheckerOrder[] = [
-  {
-    orderId: "o-001",
-    source: "Table 12",
-    createdAt: "2025-11-25T19:05:00Z",
-    meals: [
-      { id: "m-burger", name: "Burger", qty: 2, done: 0, verified: false },
-      { id: "m-fries", name: "Fries", qty: 1, done: 0, verified: false },
-    ],
-  },
-  {
-    orderId: "o-002",
-    source: "Table 3",
-    createdAt: "2025-11-25T19:10:00Z",
-    meals: [
-      { id: "m-fries", name: "Fries", qty: 3, done: 1, verified: false },
-      { id: "m-salad", name: "Salad", qty: 2, done: 0, verified: false },
-    ],
-  },
-];
 
 function fmtTime(iso: string) {
   const d = new Date(iso);
@@ -67,10 +47,13 @@ type CheckerState = {
 
 export default function CheckerPage() {
   /* Single state object to avoid nested setState issues */
-  const [checker, setChecker] = useState<CheckerState>({
-    main: initialOrders,
-    queue: [],
-  });
+ const [checker, setChecker] = useState<CheckerState>({
+  main: [],
+  queue: [],
+});
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [colorsEnabled, setColorsEnabled] = useState(true);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
@@ -127,6 +110,30 @@ export default function CheckerPage() {
       ),
     }));
   };
+
+  const loadOrders = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+
+    const data = (await apiFetch("/api/checker/orders")) as CheckerOrder[];
+
+    setChecker({
+      main: Array.isArray(data) ? data : [],
+      queue: [], // we don't use queue yet
+    });
+  } catch (e: any) {
+    console.error("Failed to load checker orders", e);
+    setError(e?.message ?? "Failed to load orders");
+  } finally {
+    setLoading(false);
+  }
+};
+
+useEffect(() => {
+  loadOrders();
+}, []);
+
 
   /* - : revert ONE prepared portion (if any) */
   const removePrepared = (

@@ -116,10 +116,10 @@ export default function StationsPage() {
     try {
       const dto = (await apiFetch("/api/stations", {
         method: "POST",
-        body: JSON.stringify({
+        body: {
           stationName: name,
           stationType: addType,
-        }),
+        },
       })) as Station | null;
 
       if (!dto) return;

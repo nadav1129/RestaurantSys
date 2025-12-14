@@ -84,7 +84,7 @@ export default function ServerCard({
         `/api/stations/${stationId}/tables`,
         {
           method: "POST",
-          body: JSON.stringify({ tableNum: parsed }),
+          body: { tableNum: parsed },
         }
       )) as { tableId: string; tableNum: number } | null;
 

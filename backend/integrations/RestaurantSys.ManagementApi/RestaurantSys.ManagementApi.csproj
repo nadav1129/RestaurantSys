@@ -35,9 +35,15 @@
 </ItemGroup>
 
 <ItemGroup>
-  <Folder Include="src\Checker\" />
+  <Content Update="appsettings.json">
+    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+  </Content>
+  <Content Update="appsettings.Development.json">
+    <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+  </Content>
 </ItemGroup>
-
 
 
 </Project>
