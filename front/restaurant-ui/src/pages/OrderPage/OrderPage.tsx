@@ -5,13 +5,35 @@ import OrderInfoCard from "./OrderInfoCard";
 import OrderMenu from "./OrderMenu";
 import ItemDetails from "./ItemDetails";
 import OrderItems from "./OrderItems";
+import { formatMoney } from "../../utils/money";
+
+/* ===== Money helpers ===== */
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+// /* Format 19.00 -> 19, 19.50 -> 19.5, 19.25 -> 19.25 */
+// export function formatMoney(n: number | null | undefined): string {
+//   if (n == null || Number.isNaN(n)) return "0";
+//   return n.toFixed(2).replace(/\.0+$/, "").replace(/(\.[0-9]*?)0+$/, "$1");
+// }
+
+/*
+  Backend currently returns prices that look like "cents" (e.g., 1900 for ₪19.00),
+  while the DB stores decimal(12,2). Normalize to "₪" for UI math + display.
+*/
+function normalizePrice(raw: number | null): number | null {
+  if (raw == null) return null;
+  if (Number.isInteger(raw) && raw >= 100) return raw / 100;
+  return raw;
+}
 
 /* ===== Types ===== */
 export type ProductItem = {
   id: string;
   name: string;
   type: string;
-  price: number | null; // ₪
+  price: number | null; // ₪ (normalized)
 };
 
 export type MenuNode = {
@@ -26,7 +48,7 @@ export type CartItem = {
   id: string;
   name: string;
   qty: number;
-  price: number; // unit price ₪
+  price: number; // unit price ₪ (normalized)
   additions: string[];
   notes?: string;
   status: "pending" | "confirmed";
@@ -41,6 +63,18 @@ type SettingsDto = {
 type OrderPageProps = {
   initialTableNum?: string | null;
   initialTableId?: string | null;
+};
+
+type ActiveOrderItemDto = {
+  productId: string;
+  name: string;
+  qty: number;
+  unitPrice: number | string;
+};
+
+type ActiveOrderDto = {
+  orderId: string | null;
+  items: ActiveOrderItemDto[];
 };
 
 export default function OrderPage({
@@ -84,11 +118,14 @@ export default function OrderPage({
   const [customAdds, setCustomAdds] = useState<string[]>([]);
 
   /* Totals */
-  const subtotal = cart.reduce((s, c) => s + c.qty * c.price, 0);
+  const subtotal = round2(cart.reduce((s, c) => s + c.qty * c.price, 0));
   const total = subtotal;
-  const only10 = Math.round(total * 0.1);
-  const totalWith10 = total + only10;
+  const only10 = round2(total * 0.1);
+  const totalWith10 = round2(total + only10);
   const minimum = total;
+
+  const hasPending = cart.some((x) => x.status === "pending");
+  const hasConfirmed = cart.some((x) => x.status === "confirmed");
 
   /* ===== Init from parent ===== */
   useEffect(() => {
@@ -159,6 +196,61 @@ export default function OrderPage({
     })();
   }, [settings?.activeMenuNum]);
 
+  /* ===== Fetch orderd items for table ===== */
+  useEffect(() => {
+    if (!activeShift?.shiftId) return;
+
+    // Build query: prefer tableId, fallback to tableNum string
+    const qs = new URLSearchParams();
+    qs.set("shiftId", activeShift.shiftId);
+
+    if (tableId) qs.set("tableId", tableId);
+    else if (table && table !== "none") qs.set("tableNum", table);
+    else qs.set("table", "none");
+
+    (async () => {
+      try {
+        const res = await apiFetch<ActiveOrderDto>(
+          `/api/orders/active?${qs.toString()}`
+        );
+
+        // If there are pending items in UI, don’t wipe them
+        const hasPendingNow = cart.some((x) => x.status === "pending");
+
+        if (!res?.orderId) {
+          if (!hasPendingNow) {
+            setOrderId(null);
+            setCart([]); // no open order => empty confirmed cart
+          }
+          return;
+        }
+
+        setOrderId(res.orderId);
+
+        if (!hasPendingNow) {
+          setCart(
+            (res.items ?? []).map((it) => {
+              const raw = Number(it.unitPrice);
+              const unit = normalizePrice(Number.isFinite(raw) ? raw : 0) ?? 0; 
+              return {
+                id: it.productId,
+                name: it.name,
+                qty: it.qty,
+                price: unit, // now ₪ (19) instead of cents (1900)
+                additions: [],
+                status: "confirmed" as const,
+              };
+            })
+          );
+        }
+      } catch (e) {
+        console.error("Load active order failed", e);
+      }
+    })();
+
+    // Important: depends on shift + table identity
+  }, [activeShift?.shiftId, tableId, table]);
+
   /* ===== Fetch products when at a leaf ===== */
   useEffect(() => {
     if (!current) return;
@@ -186,15 +278,21 @@ export default function OrderPage({
 
     (async () => {
       try {
-        const arr = await apiFetch<ProductItem[]>(
+        const arrRaw = await apiFetch<ProductItem[]>(
           `/api/menu-nodes/${current.id}/products`
         );
-        productCacheRef.current.set(current.id, arr ?? []);
+
+        const arr = (arrRaw ?? []).map((p) => ({
+          ...p,
+          price: normalizePrice(p.price),
+        }));
+
+        productCacheRef.current.set(current.id, arr);
         setPath((prev) => {
           const next = prev.slice();
           next[next.length - 1] = {
             ...current,
-            products: arr ?? [],
+            products: arr,
             isLeaf: true,
           };
           return next;
@@ -262,7 +360,7 @@ export default function OrderPage({
     try {
       const body = {
         shiftId: activeShift.shiftId,
-        tableNum: table !== "none" ? table : null, // you pass table number
+        tableNum: table !== "none" ? table : null,
         tableId,
         orderId: orderId ?? null,
         items: pending.map((x) => ({
@@ -294,7 +392,11 @@ export default function OrderPage({
       return;
     }
     setEndTime(new Date());
-    alert(`Paid ₪${totalWith10} (Total ₪${total}, Tip ₪${only10})`);
+    alert(
+      `Paid ₪${formatMoney(totalWith10)} (Total ₪${formatMoney(
+        total
+      )}, Tip ₪${formatMoney(only10)})`
+    );
     // reset
     setCart([]);
     setOrderId(null);
@@ -303,6 +405,10 @@ export default function OrderPage({
     setDiners("");
     setNote("");
   };
+
+  const topButtonLabel = hasPending ? "Confirm" : "Pay Now";
+  const topButtonDisabled = hasPending ? cart.length === 0 : !hasConfirmed;
+  const topButtonAction = hasPending ? confirmOrder : payAndClose;
 
   /* ===== RIGHT sidebar (categories) ===== */
   function CategorySidebar() {
@@ -366,30 +472,22 @@ export default function OrderPage({
         setPhone={setPhone}
         note={note}
         setNote={setNote}
-        /* If OrderInfoCard expects Date (not nullable), coerce here */
         startTime={startTime ?? new Date()}
         endTime={endTime}
         minimum={minimum}
         total={total}
         totalWith10={totalWith10}
         only10={only10}
-        onTopButtonClick={payAndClose}
-        hasItems={cart.some((x) => x.status === "confirmed")}
+        topButtonLabel={topButtonLabel}
+        topButtonDisabled={topButtonDisabled}
+        onTopButtonClick={topButtonAction}
+        hasConfirmedItems={hasConfirmed}
       />
 
       {/* EXACT column structure: left | center | right */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(280px,1fr)_minmax(500px,2fr)_minmax(280px,1fr)]">
         {/* LEFT: Order items */}
-        <OrderItems
-          cart={cart}
-          total={total}
-          totalWith10={totalWith10}
-          only10={only10}
-          onRemove={removeCartItem}
-          onConfirm={confirmOrder}
-          onPay={payAndClose}
-          hasConfirmed={cart.some((c) => c.status === "confirmed")}
-        />
+        <OrderItems cart={cart} onRemove={removeCartItem} />
 
         {/* CENTER: either product grid or item details */}
         {mode === "details" && selectedProduct ? (

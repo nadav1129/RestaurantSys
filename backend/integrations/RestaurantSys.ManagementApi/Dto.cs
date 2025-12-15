@@ -486,7 +486,7 @@ namespace RestaurantSys.Api
 
     public sealed class CheckerOrderDto
     {
-        public Guid Id { get; set; }
+        public Guid OrderId { get; set; }
         public string Table { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public List<CheckerMealDto> Meals { get; set; } = new();

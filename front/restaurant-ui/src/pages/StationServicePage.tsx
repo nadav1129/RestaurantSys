@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import Button from "../components/Button";
 import type { TableInfo, InventoryItem, Station } from "../types";
+import { formatMoney } from "../utils/money";
 
 export default function StationServicePage({
   station,
@@ -18,7 +19,6 @@ export default function StationServicePage({
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-4">
-      
       {/* Top bar */}
       <div className="mb-4 flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-4">
         <div className="text-lg font-semibold">
@@ -26,9 +26,7 @@ export default function StationServicePage({
         </div>
 
         <Button variant="secondary" onClick={() => setShowInv((v) => !v)}>
-          {showInv
-            ? "Hide Inventory"
-            : `Show ${station.stationName} Inventory`}
+          {showInv ? "Hide Inventory" : `Show ${station.stationName} Inventory`}
         </Button>
       </div>
 
@@ -59,6 +57,7 @@ export default function StationServicePage({
         <div className="mb-3 text-sm font-semibold">
           Tables ({station.stationName})
         </div>
+
         {tables.length === 0 ? (
           <div className="text-sm text-gray-400">No tables.</div>
         ) : (
@@ -66,13 +65,34 @@ export default function StationServicePage({
             {tables.map((t) => (
               <li key={t.id}>
                 <button
-                  onClick={() => onOpenOrderForTable(t.id)}
-                  className="w-full rounded-2xl border border-gray-200 bg-white p-3 text-left hover:border-gray-300 hover:bg-gray-50"
-                >
-                  <div className="text-sm font-semibold">{t.owner}</div>
+                  onClick={() => {
+                    try {
+                      sessionStorage.setItem(
+                        "lastTableNum",
+                        String(t.tableNum)
+                      );
+                      sessionStorage.setItem("lastTableId", t.id);
+                    } catch {}
 
-                  <div className="mt-1 text-xs">
-                    Total: <span className="font-medium">₪{t.total ?? 0}</span>
+                    onOpenOrderForTable(t.id);
+                  }}
+                  className="relative w-full rounded-2xl border border-gray-200 bg-white p-3 text-left hover:border-gray-300 hover:bg-gray-50"
+                >
+                  {/* table number badge (top-right) */}
+                  <div className="absolute right-2 top-2 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700">
+                    {t.tableNum}
+                  </div>
+
+                  {/* main label: guest name */}
+                  <div className="pr-10 text-sm font-semibold text-gray-900">
+                    {t.owner?.trim() ? t.owner : "—"}
+                  </div>
+
+                  <div className="mt-1 text-xs text-gray-600">
+                    Total:{" "}
+                    <span className="font-medium">
+                      ₪{formatMoney(t.total ?? 0)}
+                    </span>
                   </div>
                 </button>
               </li>

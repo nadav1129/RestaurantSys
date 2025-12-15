@@ -364,6 +364,9 @@ CREATE TABLE IF NOT EXISTS order_items (
 
   quantity   int NOT NULL CHECK (quantity > 0),
 
+  item_status text NOT NULL DEFAULT 'pending'
+              CHECK (item_status IN ('pending','in_progress','ready','served','cancelled')),
+
   -- Snapshot of price in cents
   price_cents  int NOT NULL,
 

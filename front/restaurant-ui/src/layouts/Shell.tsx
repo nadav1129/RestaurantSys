@@ -24,7 +24,17 @@ export default function Shell({
       <TopBar current={page} onNavigate={setPage} />
       <div className="flex flex-1">
         <Sidebar title="Quick Actions" defaultOpen>
-          <Button className="w-full" onClick={onQuickOrder}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              try {
+                sessionStorage.removeItem("lastTableNum");
+                sessionStorage.removeItem("lastTableId");
+              } catch {}
+
+              onQuickOrder();
+            }}
+          >
             Quick Order
           </Button>
           {/* add more buttons / links as needed */}

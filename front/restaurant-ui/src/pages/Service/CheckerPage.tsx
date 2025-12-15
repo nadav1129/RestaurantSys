@@ -1,21 +1,21 @@
 // File: src/pages/CheckerPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import Button from "../../components/Button";
-import { apiFetch } from "../../api/api";"../../api/api"; 
+import { apiFetch } from "../../api/api";
 
 /* One meal line inside an order */
 type MealLine = {
   id: string;
   name: string;
-  qty: number;       // ordered
-  done: number;      // prepared portions
+  qty: number; // ordered
+  done: number; // prepared portions
   verified: boolean; // true after checker clicks ✓
 };
 
 /* An order that came into the kitchen/checker */
 type CheckerOrder = {
   orderId: string;
-  source: string;    // table / pickup / delivery etc.
+  table: string; // table / pickup / delivery etc. (backend returns "table")
   createdAt: string; // ISO string
   meals: MealLine[];
 };
@@ -33,7 +33,6 @@ type ConfirmConfig = {
   onConfirm: () => void;
 };
 
-
 function fmtTime(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -47,10 +46,10 @@ type CheckerState = {
 
 export default function CheckerPage() {
   /* Single state object to avoid nested setState issues */
- const [checker, setChecker] = useState<CheckerState>({
-  main: [],
-  queue: [],
-});
+  const [checker, setChecker] = useState<CheckerState>({
+    main: [],
+    queue: [],
+  });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,28 +111,27 @@ export default function CheckerPage() {
   };
 
   const loadOrders = async () => {
-  try {
-    setLoading(true);
-    setError(null);
+    try {
+      setLoading(true);
+      setError(null);
 
-    const data = (await apiFetch("/api/checker/orders")) as CheckerOrder[];
+      const data = (await apiFetch("/api/checker/orders")) as CheckerOrder[];
 
-    setChecker({
-      main: Array.isArray(data) ? data : [],
-      queue: [], // we don't use queue yet
-    });
-  } catch (e: any) {
-    console.error("Failed to load checker orders", e);
-    setError(e?.message ?? "Failed to load orders");
-  } finally {
-    setLoading(false);
-  }
-};
+      setChecker({
+        main: Array.isArray(data) ? data : [],
+        queue: [], // we don't use queue yet
+      });
+    } catch (e: any) {
+      console.error("Failed to load checker orders", e);
+      setError(e?.message ?? "Failed to load orders");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-useEffect(() => {
-  loadOrders();
-}, []);
-
+  useEffect(() => {
+    loadOrders();
+  }, []);
 
   /* - : revert ONE prepared portion (if any) */
   const removePrepared = (
@@ -158,27 +156,56 @@ useEffect(() => {
     }));
   };
 
-  /* Core verify: mark line verified + ensure prepared = ordered */
-  const verifyLineForce = (
+  const markReady = async (orderId: string, productId: string) => {
+    const res = (await apiFetch(
+      `/api/checker/orders/${orderId}/items/${productId}/ready`,
+      { method: "PATCH" }
+    )) as { ok?: boolean; affected?: number };
+
+    if (!res || res.ok !== true) {
+      throw new Error("Failed to mark item ready");
+    }
+  };
+
+  // Dismiss entire order (after all lines verified)
+  const dismissOrder = async (orderId: string) => {
+  const res = (await apiFetch(`/api/checker/orders/${orderId}/dismiss`, {
+    method: "PATCH",
+  })) as { ok?: boolean; affected?: number };
+
+  if (!res?.ok) throw new Error("Failed to dismiss order");
+};
+
+
+  /* Core verify: PATCH backend + mark line verified + ensure prepared = ordered */
+  const verifyLineForce = async (
     list: "main" | "queue",
     orderId: string,
     mealId: string
   ) => {
-    setChecker((prev) => ({
-      ...prev,
-      [list]: prev[list].map((o) =>
-        o.orderId !== orderId
-          ? o
-          : {
-              ...o,
-              meals: o.meals.map((m) => {
-                if (m.id !== mealId) return m;
-                const newDone = m.done < m.qty ? m.qty : m.done;
-                return { ...m, done: newDone, verified: true };
-              }),
-            }
-      ),
-    }));
+    try {
+      setError(null);
+      await markReady(orderId, mealId);
+
+      setChecker((prev) => ({
+        ...prev,
+        [list]: prev[list].map((o) =>
+          o.orderId !== orderId
+            ? o
+            : {
+                ...o,
+                meals: o.meals.map((m) => {
+                  if (m.id !== mealId) return m;
+                  const newDone = m.done < m.qty ? m.qty : m.done;
+                  return { ...m, done: newDone, verified: true };
+                }),
+              }
+        ),
+      }));
+    } catch (e: any) {
+      console.error("Failed to mark ready", e);
+      setError(e?.message ?? "Failed to mark item ready");
+    }
   };
 
   /* ✓ : verify line; if done < qty, ask confirmation via panel */
@@ -199,10 +226,12 @@ useEffect(() => {
           "Prepared is less than ordered. Mark the rest as prepared and verify this item?",
         confirmLabel: "Yes, mark as prepared",
         cancelLabel: "Cancel",
-        onConfirm: () => verifyLineForce(list, orderId, mealId),
+        onConfirm: () => {
+          void verifyLineForce(list, orderId, mealId);
+        },
       });
     } else {
-      verifyLineForce(list, orderId, mealId);
+      void verifyLineForce(list, orderId, mealId);
     }
   };
 
@@ -232,12 +261,21 @@ useEffect(() => {
   };
 
   /* Delete card with confirmation if not all lines are green */
-  const deleteOrderForce = (list: "main" | "queue", orderId: string) => {
+  const deleteOrderForce = async (list: "main" | "queue", orderId: string) => {
+  try {
+    setError(null);
+    await dismissOrder(orderId);
+
     setChecker((prev) => ({
       ...prev,
       [list]: prev[list].filter((o) => o.orderId !== orderId),
     }));
-  };
+  } catch (e: any) {
+    console.error("Failed to dismiss order", e);
+    setError(e?.message ?? "Failed to delete order");
+  }
+};
+
 
   const deleteOrder = (list: "main" | "queue", order: CheckerOrder) => {
     const allGreen =
@@ -250,10 +288,10 @@ useEffect(() => {
           "Not all meals in this order are verified (green). Are you sure you want to delete this card?",
         confirmLabel: "Delete anyway",
         cancelLabel: "Cancel",
-        onConfirm: () => deleteOrderForce(list, order.orderId),
+        onConfirm: () => void deleteOrderForce(list, order.orderId),
       });
     } else {
-      deleteOrderForce(list, order.orderId);
+      void deleteOrderForce(list, order.orderId);
     }
   };
 
@@ -318,6 +356,22 @@ useEffect(() => {
               </Button>
             </div>
           </div>
+          {loading && (
+            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
+              Loading checker orders…
+            </div>
+          )}
+
+          {error && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+              <div className="mt-2">
+                <Button type="button" variant="secondary" onClick={loadOrders}>
+                  Retry
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Queue panel */}
           <section className="rounded-2xl border border-gray-200 bg-white p-4">
@@ -334,8 +388,9 @@ useEffect(() => {
             </div>
             {ordersQueue.length === 0 ? (
               <div className="text-sm text-gray-400">
-                Queue is empty – use <span className="font-medium">Move to queue</span> on a
-                table if you want to handle it separately.
+                Queue is empty – use{" "}
+                <span className="font-medium">Move to queue</span> on a table if
+                you want to handle it separately.
               </div>
             ) : (
               <ul className="space-y-3">
@@ -444,7 +499,8 @@ useEffect(() => {
               Meals to prepare
             </div>
             <div className="text-xs text-gray-500">
-              Aggregated remaining portions across all open orders (main + queue).
+              Aggregated remaining portions across all open orders (main +
+              queue).
             </div>
           </div>
 
@@ -468,10 +524,7 @@ useEffect(() => {
 
       {/* Small in-app confirm panel (no browser UI) */}
       {confirm && (
-        <ConfirmPanel
-          config={confirm}
-          onCancel={() => setConfirm(null)}
-        />
+        <ConfirmPanel config={confirm} onCancel={() => setConfirm(null)} />
       )}
     </>
   );
@@ -493,7 +546,7 @@ function OrderCardHeader({
     <div className="mb-2 flex items-center justify-between">
       <div>
         <div className="font-semibold">
-          {order.source} ·{" "}
+          {order.table} ·{" "}
           <span className="text-xs font-normal text-gray-500">
             {fmtTime(order.createdAt)}
           </span>
@@ -575,9 +628,7 @@ function MealList({
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() =>
-                  onRemovePrepared(list, order.orderId, m.id)
-                }
+                onClick={() => onRemovePrepared(list, order.orderId, m.id)}
                 disabled={m.done === 0}
               >
                 -
@@ -587,9 +638,7 @@ function MealList({
               <Button
                 type="button"
                 variant="secondary"
-                onClick={() =>
-                  onAddPrepared(list, order.orderId, m.id)
-                }
+                onClick={() => onAddPrepared(list, order.orderId, m.id)}
                 disabled={allDone}
               >
                 +
@@ -598,9 +647,7 @@ function MealList({
               {/* ✓ button: verify (with confirmation if done < qty) */}
               <Button
                 type="button"
-                onClick={() =>
-                  onVerifyLine(list, order.orderId, m.id)
-                }
+                onClick={() => onVerifyLine(list, order.orderId, m.id)}
               >
                 ✓
               </Button>

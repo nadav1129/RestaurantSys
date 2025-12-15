@@ -1,6 +1,12 @@
-// src/pages/Order/OrderMenu.tsx
+// src/pages/OrderPage/OrderMenu.tsx
 import React from "react";
 import type { MenuNode, ProductItem } from "./OrderPage";
+
+/* Format 19.00 -> 19, 19.50 -> 19.5 */
+function formatMoney(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(n)) return "0";
+  return n.toFixed(2).replace(/\.0+$/, "").replace(/(\.[0-9]*?)0+$/, "$1");
+}
 
 type OrderMenuProps = {
   path: MenuNode[];
@@ -33,7 +39,7 @@ export default function OrderMenu({ path, current, products, onPickProduct }: Or
             >
               <div className="font-medium text-gray-800">{p.name}</div>
               <div className="text-xs text-gray-500">
-                {p.price != null ? `₪${p.price}` : "n/a"}
+                {p.price != null ? `₪${formatMoney(p.price)}` : "n/a"}
               </div>
             </button>
           ))}

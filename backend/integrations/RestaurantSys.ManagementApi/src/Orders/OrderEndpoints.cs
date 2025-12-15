@@ -46,156 +46,213 @@ public static class OrderEndpoints
                 if (body.ValueKind != JsonValueKind.Object)
                     return Results.BadRequest(new { error = "Invalid JSON." });
 
-                // === 1) Basic fields from body ===
-
+                /* shiftId */
                 if (!TryGetGuid(body, "shiftId", out var shiftId) || shiftId == Guid.Empty)
                     return Results.BadRequest(new { error = "shiftId is required." });
 
-                // For now we are not resolving "table" (text) -> tables.table_id.
-                // Quick orders send "none", real table flow will later send a proper tableId.
-                var tableString = GetString(body, "table");
+                /* table identity (accept: tableId OR tableNum OR legacy table string) */
                 Guid? tableId = null;
                 if (TryGetGuid(body, "tableId", out var tId) && tId != Guid.Empty)
                     tableId = tId;
 
+                int? tableNum = null;
+
+                if (body.TryGetProperty("tableNum", out var tn))
+                {
+                    if (tn.ValueKind == JsonValueKind.Number && tn.TryGetInt32(out var n)) 
+                        tableNum = n;
+                    else if (tn.ValueKind == JsonValueKind.String && int.TryParse(tn.GetString(), out var ns)) 
+                        tableNum = ns;
+                }
+
+                var tableString = GetString(body, "table"); /* legacy support */
+                if (tableNum is null && !string.IsNullOrWhiteSpace(tableString) && !tableString.Equals("none", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (int.TryParse(tableString, out var n2)) tableNum = n2;
+                }
+
+                /* other fields */
                 var guestName = GetString(body, "guestName");
                 var guestPhone = GetString(body, "guestPhone");
                 var dinersCount = GetInt(body, "dinersCount");
                 var note = GetString(body, "note");
 
-                if (!body.TryGetProperty("items", out var itemsEl) ||
-                    itemsEl.ValueKind != JsonValueKind.Array ||
-                    itemsEl.GetArrayLength() == 0)
+                /* items */
+                if (!body.TryGetProperty("items", out var itemsEl) ||itemsEl.ValueKind != JsonValueKind.Array ||itemsEl.GetArrayLength() == 0)
                 {
                     return Results.BadRequest(new { error = "items is required and must be a non-empty array." });
                 }
 
-                // === 2) Work in a single DB connection + transaction ===
-
                 await using var conn = await db.OpenConnectionAsync();
                 await using var tx = await conn.BeginTransactionAsync();
 
+                /* Resolve tableNum -> tableId (critical fix - to be removed) */
+                if (tableId is null && tableNum is not null)
+                {
+                    const string TABLE_LOOKUP = @"
+                select table_id
+                from tables
+                where table_number = @table_number
+                limit 1;";
+
+                    await using var tcmd = new NpgsqlCommand(TABLE_LOOKUP, conn, tx);
+                    tcmd.Parameters.AddWithValue("table_number", tableNum.Value);
+
+                    var res = await tcmd.ExecuteScalarAsync();
+                    if (res is Guid g) tableId = g;
+                    else
+                    {
+                        await tx.RollbackAsync();
+                        return Results.BadRequest(new { error = $"Unknown table_number {tableNum}." });
+                    }
+                }
+
                 Guid orderId;
 
-                // 2a) Try to find an existing open order for this (shiftId, tableId)
-                const string findSql = @"
-                    select order_id
-                    from orders
-                    where shift_id = @shift_id
-                      and table_id is not distinct from @table_id
-                      and status = 'open'
-                    limit 1;
-                ";
-
-                await using (var findCmd = new NpgsqlCommand(findSql, conn, tx))
+                /* Find/create open order:
+                   - If tableId != null => one open order per (shiftId, tableId)
+                   - If tableId == null => treat as "quick" order (NULL table); still find/create but never mixes with table orders
+                */
+                if (tableId is null)
                 {
-                    findCmd.Parameters.AddWithValue("shift_id", shiftId);
-                    findCmd.Parameters.AddWithValue("table_id", (object?)tableId ?? DBNull.Value);
+                    const string FIND_QUICK = @"
+                select order_id
+                from orders
+                where shift_id = @shift_id
+                  and table_id is null
+                  and status = 'open'
+                  and source = 'quick'
+                limit 1;";
 
-                    await using var reader = await findCmd.ExecuteReaderAsync();
-                    if (await reader.ReadAsync())
+                    await using var findCmd = new NpgsqlCommand(FIND_QUICK, conn, tx);
+                    findCmd.Parameters.AddWithValue("shift_id", shiftId);
+
+                    var found = await findCmd.ExecuteScalarAsync();
+                    if (found is Guid fg)
                     {
-                        orderId = reader.GetGuid(0);
+                        orderId = fg;
                     }
                     else
                     {
-                        // 2b) No open order yet => create one
-                        const string insertSql = @"
-                            insert into orders
-                              (shift_id, table_id, opened_by_worker_id, source, status,
-                               opened_at, guest_name, guest_phone, diners_count, note)
-                            values
-                              (@shift_id, @table_id, null, 'table', 'open',
-                               now(), @guest_name, @guest_phone, @diners_count, @note)
-                            returning order_id;
-                        ";
+                        const string INSERT_QUICK = @"
+                    insert into orders
+                      (shift_id, table_id, opened_by_worker_id, source, status,
+                       opened_at, guest_name, guest_phone, diners_count, note)
+                    values
+                      (@shift_id, null, null, 'quick', 'open',
+                       now(), @guest_name, @guest_phone, @diners_count, @note)
+                    returning order_id;";
 
-                        await reader.DisposeAsync(); // just to be safe before reusing connection
-
-                        await using var insertCmd = new NpgsqlCommand(insertSql, conn, tx);
+                        await using var insertCmd = new NpgsqlCommand(INSERT_QUICK, conn, tx);
                         insertCmd.Parameters.AddWithValue("shift_id", shiftId);
-                        insertCmd.Parameters.AddWithValue("table_id", (object?)tableId ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("guest_name", (object?)guestName ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("guest_phone", (object?)guestPhone ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("diners_count", (object?)dinersCount ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("note", (object?)note ?? DBNull.Value);
 
-                        var result = await insertCmd.ExecuteScalarAsync();
-                        if (result is Guid g)
-                        {
-                            orderId = g;
-                        }
-                        else
+                        var created = await insertCmd.ExecuteScalarAsync();
+                        if (created is not Guid og)
                         {
                             await tx.RollbackAsync();
-                            return Results.Problem("Failed to create order.", statusCode: 500);
+                            return Results.Problem("Failed to create quick order.", statusCode: 500);
                         }
+                        orderId = og;
+                    }
+                }
+                else
+                {
+                    const string FIND_TABLE = @"
+                select order_id
+                from orders
+                where shift_id = @shift_id
+                  and table_id = @table_id
+                  and status = 'open'
+                limit 1;";
+
+                    await using var findCmd = new NpgsqlCommand(FIND_TABLE, conn, tx);
+                    findCmd.Parameters.AddWithValue("shift_id", shiftId);
+                    findCmd.Parameters.AddWithValue("table_id", tableId.Value);
+
+                    var found = await findCmd.ExecuteScalarAsync();
+                    if (found is Guid fg)
+                    {
+                        orderId = fg;
+                    }
+                    else
+                    {
+                        const string INSERT_TABLE = @"
+                    insert into orders
+                      (shift_id, table_id, opened_by_worker_id, source, status,
+                       opened_at, guest_name, guest_phone, diners_count, note)
+                    values
+                      (@shift_id, @table_id, null, 'table', 'open',
+                       now(), @guest_name, @guest_phone, @diners_count, @note)
+                    returning order_id;";
+
+                        await using var insertCmd = new NpgsqlCommand(INSERT_TABLE, conn, tx);
+                        insertCmd.Parameters.AddWithValue("shift_id", shiftId);
+                        insertCmd.Parameters.AddWithValue("table_id", tableId.Value);
+                        insertCmd.Parameters.AddWithValue("guest_name", (object?)guestName ?? DBNull.Value);
+                        insertCmd.Parameters.AddWithValue("guest_phone", (object?)guestPhone ?? DBNull.Value);
+                        insertCmd.Parameters.AddWithValue("diners_count", (object?)dinersCount ?? DBNull.Value);
+                        insertCmd.Parameters.AddWithValue("note", (object?)note ?? DBNull.Value);
+
+                        var created = await insertCmd.ExecuteScalarAsync();
+                        if (created is not Guid og)
+                        {
+                            await tx.RollbackAsync();
+                            return Results.Problem("Failed to create table order.", statusCode: 500);
+                        }
+                        orderId = og;
                     }
                 }
 
-                // === 3) Insert order_items for each cart line ===
-
+                /* Insert items */
                 const string insertItemSql = @"
-                    insert into order_items (order_id, product_id, quantity, price_cents)
-                    values (@order_id, @product_id, @quantity, @price_cents);
-                ";
+            insert into order_items (order_id, product_id, quantity, price_cents, item_status)
+            values (@order_id, @product_id, @quantity, @price, 'in_progress');";
 
                 foreach (var item in itemsEl.EnumerateArray())
                 {
-                    // productId (required)
                     if (!TryGetGuid(item, "productId", out var productId) || productId == Guid.Empty)
                     {
                         await tx.RollbackAsync();
                         return Results.BadRequest(new { error = "Each item must have a valid productId." });
                     }
 
-                    // qty (default 1 if not provided)
                     int qty = 1;
                     if (item.TryGetProperty("qty", out var qtyEl) &&
                         qtyEl.ValueKind == JsonValueKind.Number &&
-                        qtyEl.TryGetInt32(out var q) &&
-                        q > 0)
+                        qtyEl.TryGetInt32(out var q) && q > 0)
                     {
                         qty = q;
                     }
 
-                    // unitPrice comes in shekels (from UI) -> convert to cents
-                    int priceCents = 0;
-                    if (item.TryGetProperty("unitPrice", out var priceEl) &&
-                        priceEl.ValueKind == JsonValueKind.Number)
+                    /* price lookup */
+                    int price = 0;
+                    const string priceSql = @"select price from product_prices where product_id = @product_id;";
+                    await using (var priceCmd = new NpgsqlCommand(priceSql, conn, tx))
                     {
-                        // use decimal to avoid float rounding issues
-                        if (priceEl.TryGetDecimal(out var priceDecimal))
-                        {
-                            priceCents = (int)Math.Round(priceDecimal * 100m, MidpointRounding.AwayFromZero);
-                        }
+                        priceCmd.Parameters.AddWithValue("product_id", productId);
+                        var p = await priceCmd.ExecuteScalarAsync();
+                        if (p is int pc) price = pc;
+                        else if (p is long pl) price = (int)pl;
+                        else if (p is decimal pd) price = (int)Math.Round(pd * 100m, MidpointRounding.AwayFromZero);
                     }
 
                     await using var itemCmd = new NpgsqlCommand(insertItemSql, conn, tx);
                     itemCmd.Parameters.AddWithValue("order_id", orderId);
                     itemCmd.Parameters.AddWithValue("product_id", productId);
                     itemCmd.Parameters.AddWithValue("quantity", qty);
-                    itemCmd.Parameters.AddWithValue("price_cents", priceCents);
+                    itemCmd.Parameters.AddWithValue("price", price);
 
                     await itemCmd.ExecuteNonQueryAsync();
                 }
 
-                // === 4) (Future) Router logic goes here ===
-                // For now, CheckerPage can query:
-                //   orders (where status = 'open')
-                //   join order_items
-                //   join products on products.product_id = order_items.product_id
-                //   filter products.type in ('food', ...) to show kitchen items.
-
                 await tx.CommitAsync();
 
-                var obj = new
-                {
-                    OrderId = orderId
-                };
-
                 return Results.Json(
-                    obj,
+                    new { orderId },
                     new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
                 );
             }
@@ -205,6 +262,7 @@ public static class OrderEndpoints
                 return Results.Problem("POST /api/orders/confirm failed", statusCode: 500);
             }
         });
+
 
 
 
@@ -594,43 +652,111 @@ public static class OrderEndpoints
             if (req.Query.TryGetValue("tableId", out var raw) && Guid.TryParse(raw!, out var tId))
                 tableId = tId;
 
+            int? tableNum = null;
+            if (req.Query.TryGetValue("tableNum", out var rawNum))
+            {
+                if (int.TryParse(rawNum!, out var n)) tableNum = n;
+            }
+
+            var tableString = req.Query.TryGetValue("table", out var rawTable) ? rawTable.ToString() : null;
+            if (tableNum is null && !string.IsNullOrWhiteSpace(tableString) && !tableString.Equals("none", StringComparison.OrdinalIgnoreCase))
+            {
+                if (int.TryParse(tableString, out var n2)) tableNum = n2;
+            }
+
             try
             {
-                const string FIND_SQL = @"
-            select o.order_id
-            from orders o
-            where o.shift_id = @shift_id
-              and o.table_id is not distinct from @table_id
-              and o.status = 'open'
-            limit 1;";
-
                 await using var conn = await db.OpenConnectionAsync();
 
-                Guid? orderId = null;
-                await using (var find = new NpgsqlCommand(FIND_SQL, conn))
+                /* Resolve tableNum -> tableId (same critical fix) */
+                if (tableId is null && tableNum is not null)
                 {
+                    const string TABLE_LOOKUP = @"
+                select table_id
+                from tables
+                where table_number = @table_number
+                limit 1;";
+
+                    await using var tcmd = new NpgsqlCommand(TABLE_LOOKUP, conn);
+                    tcmd.Parameters.AddWithValue("table_number", tableNum.Value);
+
+                    var res = await tcmd.ExecuteScalarAsync();
+                    if (res is Guid g) tableId = g;
+                    else
+                    {
+                        return Results.BadRequest($"Unknown table_number {tableNum}.");
+                    }
+                }
+
+                Guid? orderId = null;
+
+                if (tableId is null)
+                {
+                    /* Safety rule:
+                       If caller didn't specify a table, DON'T return the shared NULL-table order by accident.
+                       Only return quick order if they explicitly asked for table=none.
+                    */
+                    if (!string.IsNullOrWhiteSpace(tableString) && tableString.Equals("none", StringComparison.OrdinalIgnoreCase))
+                    {
+                        const string FIND_QUICK = @"
+                    select order_id
+                    from orders
+                    where shift_id = @shift_id
+                      and table_id is null
+                      and status = 'open'
+                      and source = 'quick'
+                    limit 1;";
+
+                        await using var find = new NpgsqlCommand(FIND_QUICK, conn);
+                        find.Parameters.AddWithValue("shift_id", shiftId);
+
+                        var res = await find.ExecuteScalarAsync();
+                        if (res is Guid g) orderId = g;
+                    }
+                    else
+                    {
+                        return Results.Json(
+                            new { orderId = (Guid?)null, items = Array.Empty<object>() },
+                            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
+                        );
+                    }
+                }
+                else
+                {
+                    const string FIND_TABLE = @"
+                select o.order_id
+                from orders o
+                where o.shift_id = @shift_id
+                  and o.table_id = @table_id
+                  and o.status = 'open'
+                limit 1;";
+
+                    await using var find = new NpgsqlCommand(FIND_TABLE, conn);
                     find.Parameters.AddWithValue("shift_id", shiftId);
-                    find.Parameters.AddWithValue("table_id", (object?)tableId ?? DBNull.Value);
+                    find.Parameters.AddWithValue("table_id", tableId.Value);
+
                     var res = await find.ExecuteScalarAsync();
                     if (res is Guid g) orderId = g;
                 }
 
                 if (orderId is null)
                 {
-                    return Results.Json(new { orderId = (Guid?)null, items = Array.Empty<object>() },
-                        new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                    return Results.Json(
+                        new { orderId = (Guid?)null, items = Array.Empty<object>() },
+                        new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
+                    );
                 }
-
                 const string ITEMS_SQL = @"
-            select
-              oi.product_id,
-              p.name,
-              oi.quantity,
-              oi.price_cents
-            from order_items oi
-            join products p on p.product_id = oi.product_id
-            where oi.order_id = @order_id
-            order by oi.created_at;";
+    select
+      oi.product_id,
+      coalesce(p.name, '[missing product]') as name,
+      oi.quantity,
+      oi.price_cents
+    from order_items oi
+    left join products p on p.product_id = oi.product_id
+    where oi.order_id = @order_id
+    order by oi.created_at;
+";
 
                 var items = new List<object>();
                 await using (var itemsCmd = new NpgsqlCommand(ITEMS_SQL, conn))
@@ -644,13 +770,15 @@ public static class OrderEndpoints
                             productId = r.GetGuid(0),
                             name = r.GetString(1),
                             qty = r.GetInt32(2),
-                            unitPrice = r.GetInt32(3) / 100m, // cents -> shekels
+                            unitPrice = r.GetInt32(3) / 100m,
                         });
                     }
                 }
 
-                return Results.Json(new { orderId, items },
-                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                return Results.Json(
+                    new { orderId, items },
+                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
+                );
             }
             catch (Exception ex)
             {
@@ -658,6 +786,7 @@ public static class OrderEndpoints
                 return Results.Problem("GET /api/orders/active failed", statusCode: 500);
             }
         });
+
 
 
 

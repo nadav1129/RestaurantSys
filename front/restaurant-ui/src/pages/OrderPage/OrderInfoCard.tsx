@@ -9,6 +9,12 @@ function formatTime(d: Date | null): string {
   });
 }
 
+/* Format 19.00 -> 19, 19.50 -> 19.5 */
+function formatMoney(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(n)) return "0";
+  return n.toFixed(2).replace(/\.0+$/, "").replace(/(\.[0-9]*?)0+$/, "$1");
+}
+
 type OrderInfoCardProps = {
   table: string;
   setTable: (value: string) => void;
@@ -36,8 +42,11 @@ type OrderInfoCardProps = {
   totalWith10: number;
   only10: number;
 
+  topButtonLabel: string;          /* "Confirm" when pending exists, else "Pay Now" */
+  topButtonDisabled?: boolean;
   onTopButtonClick: () => void;
-  hasItems: boolean;
+
+  hasConfirmedItems: boolean;      /* for Print */
 };
 
 export default function OrderInfoCard({
@@ -59,8 +68,10 @@ export default function OrderInfoCard({
   total,
   totalWith10,
   only10,
+  topButtonLabel,
+  topButtonDisabled = false,
   onTopButtonClick,
-  hasItems,
+  hasConfirmedItems,
 }: OrderInfoCardProps) {
   const [showGuestEditor, setShowGuestEditor] = useState(false);
   const [tempName, setTempName] = useState(guestName);
@@ -163,25 +174,25 @@ export default function OrderInfoCard({
           </div>
         </div>
 
-        {/* Right: totals + Print + Pay Now anchored to bottom */}
+        {/* Right: totals + Print + Confirm/Pay anchored to bottom */}
         <div className="mt-2 flex w-full max-w-xs flex-col justify-between text-sm md:mt-0 md:self-stretch">
           {/* Totals text */}
           <div className="space-y-1 text-right">
             <div>
               <span className="text-gray-500">Minimum: </span>
-              <span className="font-medium">₪{minimum}</span>
+              <span className="font-medium">₪{formatMoney(minimum)}</span>
             </div>
             <div>
               <span className="text-gray-500">Total: </span>
-              <span className="font-medium">₪{total}</span>
+              <span className="font-medium">₪{formatMoney(total)}</span>
             </div>
             <div>
               <span className="text-gray-500">Total + 10%: </span>
-              <span className="font-semibold">₪{totalWith10}</span>
+              <span className="font-semibold">₪{formatMoney(totalWith10)}</span>
             </div>
             <div>
               <span className="text-gray-500">Only 10%: </span>
-              <span className="font-medium">₪{only10}</span>
+              <span className="font-medium">₪{formatMoney(only10)}</span>
             </div>
           </div>
 
@@ -191,17 +202,18 @@ export default function OrderInfoCard({
               <Button
                 variant="secondary"
                 onClick={() => window.print()}
-                disabled={!hasItems}
+                disabled={!hasConfirmedItems}
                 className="flex-1 justify-center"
               >
                 Print recite
               </Button>
+
               <Button
                 onClick={onTopButtonClick}
-                disabled={!hasItems}
+                disabled={topButtonDisabled}
                 className="flex-1 justify-center"
               >
-                Pay Now
+                {topButtonLabel}
               </Button>
             </div>
           </div>

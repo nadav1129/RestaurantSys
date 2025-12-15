@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import StationServicePage from "../StationServicePage";
 import { apiFetch } from "../../api/api";
 import type { Station, TableInfo, InventoryItem } from "../../types/";
+import { normalizeMoney as normalizePrice } from "../../utils/money";
 
 /* Still mocked until you have a real inventory endpoint */
 const mockInv: InventoryItem[] = [
@@ -14,14 +15,38 @@ const mockInv: InventoryItem[] = [
 
 type BarPageProps = {
   station: Station;
-  onOpenOrderForTable: (tableNum: string) => void; /* required */
+
+  /* IMPORTANT: should be tableId (GUID) */
+  onOpenOrderForTable: (tableId: string) => void;
 };
 
-export default function BarPage({ station, onOpenOrderForTable }: BarPageProps) {
+type TablesDto = { tableId: string; tableNum: number };
+type ActiveShiftDto = { shiftId: string; openedAt: string } | null;
+
+type ActiveOrderDto = {
+  orderId: string | null;
+  items: {
+    productId: string;
+    name: string;
+    qty: number;
+    unitPrice: number | string;
+  }[];
+};
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+export default function BarPage({
+  station,
+  onOpenOrderForTable,
+}: BarPageProps) {
   const [tables, setTables] = useState<TableInfo[]>([]);
+  const [rawTables, setRawTables] = useState<TablesDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /* Load station tables */
   useEffect(() => {
     let cancelled = false;
 
@@ -30,22 +55,22 @@ export default function BarPage({ station, onOpenOrderForTable }: BarPageProps) 
         setLoading(true);
         setError(null);
 
-        // Backend: GET /api/stations/{stationId}/tables
-        // Expected DTO: { tableId: string; tableNum: number }[]
         const data = (await apiFetch(
           `/api/stations/${station.stationId}/tables`,
           { method: "GET" }
-        )) as { tableId: string; tableNum: number }[] | null;
+        )) as TablesDto[] | null;
 
         if (cancelled) return;
 
-        // Use the TABLE NUMBER as TableInfo.id so clicking can just pass id
-        const mapped: TableInfo[] =
-          data?.map((t) => ({
-            id: String(t.tableNum),      /* <- this is the table number */
-            owner: `Table ${t.tableNum}`,
-            total: 0,
-          })) ?? [];
+        const list = data ?? [];
+        setRawTables(list);
+
+        const mapped: TableInfo[] = list.map((t) => ({
+          id: t.tableId /* keep GUID */,
+          tableNum: t.tableNum,
+          owner: "-" /* will be filled later if needed */,
+          total: 0 /* will be filled next effect */,
+        }));
 
         setTables(mapped);
       } catch (e) {
@@ -61,53 +86,131 @@ export default function BarPage({ station, onOpenOrderForTable }: BarPageProps) 
     };
   }, [station.stationId]);
 
-  /** Normalize whatever StationServicePage passes to a table number string */
+  /* Fill totals per table (sum of open order items) */
+  useEffect(() => {
+    let cancelled = false;
+
+    if (rawTables.length === 0) return;
+
+    (async () => {
+      try {
+        const shift = await apiFetch<ActiveShiftDto>("/api/shifts/active");
+        if (!shift?.shiftId) return;
+
+        /* For each table, fetch its active order and sum qty * unitPrice */
+        const pairs = await Promise.all(
+          rawTables.map(async (t) => {
+            try {
+              const res = await apiFetch<ActiveOrderDto>(
+                `/api/orders/active?shiftId=${encodeURIComponent(
+                  shift.shiftId
+                )}&tableId=${encodeURIComponent(t.tableId)}`
+              );
+
+              const sum = (res?.items ?? []).reduce((acc, it) => {
+                const raw = Number(it.unitPrice);
+                const unit =
+                  normalizePrice(Number.isFinite(raw) ? raw : 0) ?? 0;
+                return acc + (it.qty || 0) * unit;
+              }, 0);
+
+              return [t.tableId, round2(sum)] as const;
+            } catch {
+              return [t.tableId, 0] as const;
+            }
+          })
+        );
+
+        if (cancelled) return;
+
+        const totalById = new Map<string, number>(pairs);
+        setTables((prev) =>
+          prev.map((x) => ({
+            ...x,
+            total: totalById.get(x.id) ?? 0,
+          }))
+        );
+      } catch (e) {
+        console.error("Failed to load table totals", e);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rawTables]);
+
+  /* Fill guest name per table (does NOT overwrite totals) */
+useEffect(() => {
+  let cancelled = false;
+
+  if (rawTables.length === 0) return;
+
+  (async () => {
+    try {
+      const shift = await apiFetch<ActiveShiftDto>("/api/shifts/active");
+      if (!shift?.shiftId) return;
+
+      const orders = await apiFetch<any[]>(
+        `/api/shifts/${encodeURIComponent(shift.shiftId)}/orders`
+      );
+
+      const byTableId = new Map<string, string>();
+      for (const o of orders ?? []) {
+        if (o.status !== "open") continue;
+        if (!o.tableId) continue;
+
+        const guest = (o.guestName ?? "").trim();
+        if (guest) byTableId.set(o.tableId, guest);
+      }
+
+      if (cancelled) return;
+
+      setTables((prev) =>
+        prev.map((t) => ({
+          ...t,
+          owner: byTableId.get(t.id) ?? t.owner ?? "—",
+        }))
+      );
+    } catch (e) {
+      console.error("Failed to load guest names", e);
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+}, [rawTables.length, station.stationId]);
+
+
+  /** Normalize whatever StationServicePage passes to a tableId string */
   function handleOpen(payload: unknown) {
-    // Most correct case: StationServicePage calls with table.id (already tableNum as string)
     if (typeof payload === "string" && payload.trim() !== "") {
-      persistAndForward(payload);
+      onOpenOrderForTable(payload);
       return;
     }
 
-    // If StationServicePage sends the whole table object
     if (payload && typeof payload === "object") {
       const t = payload as any;
-      // Try common fields in order
       if (typeof t.id === "string" && t.id.trim() !== "") {
-        persistAndForward(t.id);
+        onOpenOrderForTable(t.id);
         return;
-      }
-      if (typeof t.tableNum === "number" || typeof t.tableNum === "string") {
-        persistAndForward(String(t.tableNum));
-        return;
-      }
-      if (typeof t.owner === "string") {
-        const match = t.owner.match(/\d+/); // e.g., "Table 12" -> "12"
-        if (match) {
-          persistAndForward(match[0]);
-          return;
-        }
       }
     }
 
-    console.warn("[BarPage] Could not resolve table number from click payload:", payload);
+    console.warn(
+      "[BarPage] Could not resolve tableId from click payload:",
+      payload
+    );
   }
 
-  function persistAndForward(num: string) {
-    try { sessionStorage.setItem("lastTableNum", num); } catch {}
-    onOpenOrderForTable(num);
-  }
-
-  if (error) {
-    console.warn("BarPage tables error:", error);
-  }
+  if (error) console.warn("BarPage tables error:", error);
 
   return (
     <StationServicePage
       station={station}
       tables={tables}
       inventory={mockInv}
-      // IMPORTANT: we pass our defensive wrapper
       onOpenOrderForTable={handleOpen}
     />
   );

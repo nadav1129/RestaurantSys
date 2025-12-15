@@ -1,4 +1,4 @@
-// src/pages/Order/ItemDetails.tsx
+// src/pages/OrderPage/ItemDetails.tsx
 import React from "react";
 import type { ProductItem } from "./OrderPage";
 

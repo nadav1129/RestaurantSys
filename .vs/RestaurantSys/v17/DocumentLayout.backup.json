@@ -3,8 +3,12 @@
   "WorkspaceRootPath": "C:\\Projects\\RestaurantSys\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|c:\\projects\\restaurantsys\\backend\\integrations\\restaurantsys.managementapi\\restaurantsys.managementapi.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}",
-      "RelativeMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|solutionrelative:backend\\integrations\\restaurantsys.managementapi\\restaurantsys.managementapi.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}"
+      "AbsoluteMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|c:\\projects\\restaurantsys\\backend\\integrations\\restaurantsys.managementapi\\src\\orders\\orderendpoints.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|solutionrelative:backend\\integrations\\restaurantsys.managementapi\\src\\orders\\orderendpoints.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|c:\\projects\\restaurantsys\\backend\\integrations\\restaurantsys.managementapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|solutionrelative:backend\\integrations\\restaurantsys.managementapi\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{754C11AD-3487-9662-A452-FB4D4555ABB1}|backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj|c:\\projects\\restaurantsys\\backend\\integrations\\restaurantsys.managementapi\\src\\checker\\checkerendpoints.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -39,32 +43,45 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "RestaurantSys.ManagementApi",
-              "DocumentMoniker": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj",
-              "RelativeDocumentMoniker": "backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj",
-              "ToolTip": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj",
-              "RelativeToolTip": "backend\\integrations\\RestaurantSys.ManagementApi\\RestaurantSys.ManagementApi.csproj",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
-              "WhenOpened": "2025-12-11T12:59:33.176Z",
+              "Title": "OrderEndpoints.cs",
+              "DocumentMoniker": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\src\\Orders\\OrderEndpoints.cs",
+              "RelativeDocumentMoniker": "backend\\integrations\\RestaurantSys.ManagementApi\\src\\Orders\\OrderEndpoints.cs",
+              "ToolTip": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\src\\Orders\\OrderEndpoints.cs*",
+              "RelativeToolTip": "backend\\integrations\\RestaurantSys.ManagementApi\\src\\Orders\\OrderEndpoints.cs*",
+              "ViewState": "AgIAABQCAAAAAAAAAAAAAEoCAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-13T15:11:21.639Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 1,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\Program.cs",
+              "RelativeDocumentMoniker": "backend\\integrations\\RestaurantSys.ManagementApi\\Program.cs",
+              "ToolTip": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\Program.cs",
+              "RelativeToolTip": "backend\\integrations\\RestaurantSys.ManagementApi\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAJkAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-12-13T14:50:34.939Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "CheckerEndpoints.cs",
               "DocumentMoniker": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\src\\Checker\\CheckerEndpoints.cs",
               "RelativeDocumentMoniker": "backend\\integrations\\RestaurantSys.ManagementApi\\src\\Checker\\CheckerEndpoints.cs",
               "ToolTip": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\src\\Checker\\CheckerEndpoints.cs",
               "RelativeToolTip": "backend\\integrations\\RestaurantSys.ManagementApi\\src\\Checker\\CheckerEndpoints.cs",
-              "ViewState": "AgIAAAgAAAAAAAAAAAAxwBQAAABKAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAFAAAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-12-10T19:19:28.719Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "ShiftWorkersEndpoints.cs",
               "DocumentMoniker": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\src\\Shift\\ShiftWorkersEndpoints.cs",
               "RelativeDocumentMoniker": "backend\\integrations\\RestaurantSys.ManagementApi\\src\\Shift\\ShiftWorkersEndpoints.cs",
@@ -76,7 +93,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "ShiftEndpoints.cs",
               "DocumentMoniker": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\src\\Shift\\ShiftEndpoints.cs",
               "RelativeDocumentMoniker": "backend\\integrations\\RestaurantSys.ManagementApi\\src\\Shift\\ShiftEndpoints.cs",
@@ -88,7 +105,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 5,
               "Title": "StationsEndpoints.cs",
               "DocumentMoniker": "C:\\Projects\\RestaurantSys\\backend\\integrations\\RestaurantSys.ManagementApi\\src\\Management\\Stations\\StationsEndpoints.cs",
               "RelativeDocumentMoniker": "backend\\integrations\\RestaurantSys.ManagementApi\\src\\Management\\Stations\\StationsEndpoints.cs",

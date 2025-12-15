@@ -12,6 +12,7 @@ export type TableInfo = {
   id: string;          // e.g., "12"
   owner: string;      // e.g., "Nadav"
   total: number;      // e.g., 128
+  tableNum: number; // e.g., 12
 };
 
 export type InventoryItem = {
