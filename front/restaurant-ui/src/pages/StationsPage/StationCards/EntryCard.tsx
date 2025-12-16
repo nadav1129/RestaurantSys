@@ -61,7 +61,7 @@ export default function EntryCard({
       setModBusy((m) => ({ ...m, [list.listId]: true }));
       await apiFetch(`/api/stations/${stationId}/lists`, {
         method: "POST",
-        body: JSON.stringify({ listId: list.listId }),
+        body: { listId: list.listId },
       });
       setAttached((prev) =>
         prev.some((x) => x.listId === list.listId) ? prev : [list, ...prev]

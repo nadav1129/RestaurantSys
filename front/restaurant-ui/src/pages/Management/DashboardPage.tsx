@@ -79,7 +79,7 @@ export default function DashboardPage() {
 
       const created = (await apiFetch("/api/shifts", {
         method: "POST",
-        body: JSON.stringify({ name: null }), // optional shift name, you can change later
+        body: { name: null }, // optional shift name, you can change later
       })) as ShiftDto;
 
       setActiveShift(created);

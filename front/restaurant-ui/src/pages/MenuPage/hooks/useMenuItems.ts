@@ -116,7 +116,7 @@ export default function useMenuItems(
         await apiFetch(`/api/menu-nodes/${selectedNodeId}/products`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ productId: row.productId }),
+          body: { productId: row.productId },
         });
       }
 
@@ -124,11 +124,11 @@ export default function useMenuItems(
       await apiFetch(`/api/product-prices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: {
           productId: row.productId,
           menuNum: selectedMenu,
           price, // integer cents
-        }),
+        },
       });
 
       // 3) clear flags locally

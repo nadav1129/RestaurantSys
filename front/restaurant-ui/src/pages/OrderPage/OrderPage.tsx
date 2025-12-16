@@ -376,7 +376,7 @@ export default function OrderPage({
       };
       const res = await apiFetch<{ orderId: string }>("/api/orders/confirm", {
         method: "POST",
-        body: JSON.stringify(body),
+        body: (body),
       });
       setOrderId(res.orderId);
       setCart((prev) => prev.map((x) => ({ ...x, status: "confirmed" })));

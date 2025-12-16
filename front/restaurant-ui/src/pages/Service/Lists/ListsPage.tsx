@@ -262,7 +262,7 @@ export default function ListsPage() {
     try {
       const dto = (await apiFetch("/api/lists", {
         method: "POST",
-        body: JSON.stringify({ title, listType: addType }),
+        body: { title, listType: addType },
       })) as ListDto | null;
 
       if (!dto) return;

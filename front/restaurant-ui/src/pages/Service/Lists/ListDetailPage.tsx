@@ -129,7 +129,7 @@ export default function ListDetailPanel({
       }
       const dto = (await apiFetch(`/api/lists/${list.listId}/entries`, {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: payload,
       })) as ListEntryDto | null;
 
       if (dto) setRows((prev) => [dto, ...prev]);
@@ -164,7 +164,7 @@ export default function ListDetailPanel({
         `/api/lists/${list.listId}/entries/${r.entryId}`,
         {
           method: "PATCH",
-          body: JSON.stringify({ arrived: next }),
+          body: { arrived: next },
         }
       )) as ListEntryDto | null;
 
@@ -260,10 +260,10 @@ export default function ListDetailPanel({
         `/api/lists/${list.listId}/entries/${linkEntry.entryId}`,
         {
           method: "PATCH",
-          body: JSON.stringify({
+          body: {
             stationId: linkStationId,
             tableId: linkTableId,
-          }),
+          },
         }
       )) as ListEntryDto | null;
 

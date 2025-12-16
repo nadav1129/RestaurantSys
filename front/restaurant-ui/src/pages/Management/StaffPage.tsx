@@ -154,7 +154,7 @@ export default function StaffPage() {
       // Expect backend to create worker + app_user + 4-digit login code
       const resp = (await apiFetch("/api/workers", {
         method: "POST",
-        body: JSON.stringify(body),
+        body: body,
       })) as CreateWorkerResponse;
 
       setWorkers((prev) => [...prev, resp.worker]);

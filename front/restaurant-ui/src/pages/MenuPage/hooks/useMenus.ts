@@ -4,6 +4,14 @@ import { apiFetch } from "../../../api/api";
 
 export type MenuSummary = { menuNum: number; name: string };
 
+type MenuDto = {
+  menuNum?: number;
+  MenuNum?: number;
+  name?: string;
+  MenuName?: string;
+  id?: number;
+};
+
 function normalizeMenus(data: any[]): MenuSummary[] {
   return data
     .map((m) => ({
@@ -67,10 +75,9 @@ export default function useMenus() {
     if (!name?.trim()) return;
 
     try {
-      const created = await apiFetch("/api/menus", {
+      const created = await apiFetch<MenuDto>("/api/menus", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() }),
+        body: { name: name.trim() },
       });
 
       const menuNum = Number(created?.menuNum ?? created?.MenuNum ?? 0);
@@ -97,17 +104,20 @@ export default function useMenus() {
       if (!name) return;
 
       try {
-        const updated = await apiFetch(`/api/menus/${selectedMenu}`, {
+        const updated = await apiFetch<MenuDto>(`/api/menus/${selectedMenu}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name }),
+          body: { name },
         });
 
-        const updatedNum = Number(updated?.menuNum ?? updated?.MenuNum ?? selectedMenu);
+        const updatedNum = Number(
+          updated?.menuNum ?? updated?.MenuNum ?? selectedMenu
+        );
         const updatedName = String(updated?.name ?? name);
 
         setMenus((prev) =>
-          prev.map((m) => (m.menuNum === updatedNum ? { ...m, name: updatedName } : m))
+          prev.map((m) =>
+            m.menuNum === updatedNum ? { ...m, name: updatedName } : m
+          )
         );
       } catch (e) {
         console.error("Rename menu failed", e);
@@ -143,7 +153,8 @@ export default function useMenus() {
 
   /* ---------- persist selection ---------- */
   useEffect(() => {
-    if (selectedMenu) localStorage.setItem("selectedMenu", String(selectedMenu));
+    if (selectedMenu)
+      localStorage.setItem("selectedMenu", String(selectedMenu));
   }, [selectedMenu]);
 
   const selectedMenuName = useMemo(

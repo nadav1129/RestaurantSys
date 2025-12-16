@@ -63,7 +63,7 @@ export default function ManagementSettingsPage() {
       const updated = await apiFetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: body,
       });
 
       // normalize returned values (trust server as source of truth)

@@ -23,7 +23,7 @@ export default function DevTestsPage() {
       const body = category ? { category } : {};
       const data = await apiFetch("/api/dev/tests/run", {
         method: "POST",
-        body : JSON.stringify(body),
+        body :body,
       });
       setResults(Array.isArray(data) ? data : []);
     } finally {

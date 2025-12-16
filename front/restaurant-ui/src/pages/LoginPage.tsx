@@ -57,9 +57,9 @@ export default function LoginPage({ onBackToUserLogin }: LoginPageProps) {
 
       const resp = (await apiFetch("/api/auth/lookup-code", {
         method: "POST",
-        body: JSON.stringify({
+        body: {
           staffCode: code.trim(),
-        }),
+        },
       })) as LookupStaffCodeResponse;
 
       console.log("Lookup staff code resp:", resp);
@@ -89,10 +89,10 @@ export default function LoginPage({ onBackToUserLogin }: LoginPageProps) {
 
       const resp = (await apiFetch("/api/auth/claim-staff-code", {
         method: "POST",
-        body: JSON.stringify({
+        body: {
           staffCode: code.trim(),
           passcode: pin.trim(),
-        }),
+        },
       })) as ClaimStaffCodeResponse;
 
       console.log("Claim staff code resp:", resp);

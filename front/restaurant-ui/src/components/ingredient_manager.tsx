@@ -70,7 +70,7 @@ export default function IngredientManager({ open, onClose }: { open: boolean; on
       const resp = await apiFetch("/api/ingredients", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ name }),
+  body: { name },
 });
 
       setItems((prev) =>

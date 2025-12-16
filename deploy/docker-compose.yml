@@ -98,8 +98,18 @@ services:
       - whatsapp-webhook
     command: tunnel --no-autoupdate --url http://whatsapp-webhook:8082
 
+  redis:
+    image: redis:7-alpine
+    container_name: rsys_redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
 volumes:
   pgdata:
   api_bin:
   api_obj:
   front_node_modules:
+  redis_data:

@@ -92,7 +92,7 @@ async function fetchProductsForNode(nodeId: string | null) {
     await apiFetch('/api/menu-nodes/${nodeId}/products', {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productId }),
+      body: { productId },
     });
   }
 

@@ -84,12 +84,12 @@ export default function useMenuTree(selectedMenu: number | null) {
     try {
       await apiFetch("/api/menu-nodes", {
         method: "POST",
-        body: JSON.stringify({
+        body: {
           name: name.trim(),
           isLeaf: false,
           parentId: parentId,                           // null => attach under this menu's root
           MenuNum: parentId ? undefined : selectedMenu, // required for root insert
-        }),
+        },
       });
 
       await reloadNodesForSelectedMenu();

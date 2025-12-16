@@ -119,7 +119,7 @@ export default function MenuPage() {
               const resp = await apiFetch("/api/products", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+                body: {
                   name: p.name,
                   type: p.isBottleOnly? "bottle" : p.productType,
                   soldAsBottleOnly: !!p.isBottleOnly,
@@ -130,7 +130,7 @@ export default function MenuPage() {
                     isLeading: l.isLeading,
                     isChangeable: l.isChangeable,
                   })),
-                }),
+                },
               });
               await fetchAllProducts(); 
               await fetchProductsForNode(selectedNodeId);
