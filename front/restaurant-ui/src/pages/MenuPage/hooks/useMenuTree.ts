@@ -108,7 +108,7 @@ export default function useMenuTree(selectedMenu: number | null) {
       await apiFetch(`/api/menu-nodes/${selectedNodeId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: next }),
+        body: { name: next },
       });
       await reloadNodesForSelectedMenu();
     } catch (e) {
