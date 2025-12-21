@@ -43,7 +43,7 @@ export default function MenuTopBar({
 
       <button
         onClick={onRename}
-        disabled={!selectedMenu}
+        disabled={selectedMenu === null}
         className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
       >
         Edit Menu
@@ -51,7 +51,7 @@ export default function MenuTopBar({
 
       <button
         onClick={onDelete}
-        disabled={!selectedMenu}
+        disabled={selectedMenu === null}
         className="rounded-xl border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
       >
         Delete Menu

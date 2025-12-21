@@ -2,6 +2,16 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../../../api/api";
 
+type MenuUi = {
+  alert: (message: string, options?: { title?: string }) => Promise<void>;
+};
+
+const browserUi: MenuUi = {
+  alert: async (message) => {
+    window.alert(message);
+  },
+};
+
 export type MenuItemRow = {
   menuItemId: string;
   productId: string;
@@ -13,7 +23,8 @@ export type MenuItemRow = {
 
 export default function useMenuItems(
   selectedMenu: number | null,
-  selectedNodeId: string | null
+  selectedNodeId: string | null,
+  ui: MenuUi = browserUi
 ) {
   const [menuItems, setMenuItems] = useState<MenuItemRow[]>([]);
   const [isLoadingItems, setIsLoadingItems] = useState(false);
@@ -94,7 +105,9 @@ export default function useMenuItems(
     if (!selectedNodeId) return;
     if (!selectedMenu || selectedMenu <= 0) {
       console.warn("No menu selected; cannot upsert price.");
-      alert("Please select a menu before saving price.");
+      await ui.alert("Please select a menu before saving price.", {
+        title: "Missing Menu",
+      });
       return;
     }
     if (
@@ -102,7 +115,9 @@ export default function useMenuItems(
       row.productId === "00000000-0000-0000-0000-000000000000"
     ) {
       console.error("saveRow: missing/zero productId", row);
-      alert("Internal error: productId is missing.");
+      await ui.alert("Internal error: productId is missing.", {
+        title: "Error",
+      });
       return;
     }
 
@@ -147,7 +162,9 @@ export default function useMenuItems(
       );
     } catch (e) {
       console.error("saveRow failed", e);
-      alert("Saving price failed. Check console for details.");
+      await ui.alert("Saving price failed. Check console for details.", {
+        title: "Save Failed",
+      });
     }
   }
 

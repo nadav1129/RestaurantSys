@@ -33,14 +33,15 @@ export default function ManagementSettingsPage() {
         ]);
 
         if (!cancelled) {
-          const menusList = Array.isArray(menusResp) ? menusResp as Menu[] : [];
+          const menusListRaw = Array.isArray(menusResp) ? (menusResp as Menu[]) : [];
+          const menusList = menusListRaw.filter(m => m.menuNum > 0);
           setMenus(menusList);
 
           const s = settingsResp as ManagementSettingsDto | null;
           const active = s?.activeMenuNum ?? null;
           const pct = typeof s?.globalDiscountPct === "number" ? s!.globalDiscountPct : 0;
 
-          setSelectedMenu(active ?? (menusList.length ? menusList[0].menuNum : null));
+          setSelectedMenu(active != null && active > 0 ? active : (menusList.length ? menusList[0].menuNum : null));
           setDiscountPct(pct);
         }
       } catch (e: any) {

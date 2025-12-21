@@ -12,16 +12,34 @@ type MenuDto = {
   id?: number;
 };
 
+type MenuUi = {
+  prompt: (
+    message: string,
+    options?: { title?: string; defaultValue?: string }
+  ) => Promise<string | null>;
+  confirm: (message: string, options?: { title?: string }) => Promise<boolean>;
+  alert: (message: string, options?: { title?: string }) => Promise<void>;
+};
+
+const browserUi: MenuUi = {
+  prompt: async (message, options) =>
+    window.prompt(message, options?.defaultValue) ?? null,
+  confirm: async (message) => window.confirm(message),
+  alert: async (message) => {
+    window.alert(message);
+  },
+};
+
 function normalizeMenus(data: any[]): MenuSummary[] {
   return data
     .map((m) => ({
       menuNum: Number(m.menuNum ?? m.MenuNum ?? m.id ?? 0),
       name: String(m.name ?? m.MenuName ?? `Menu ${m.menuNum ?? ""}`),
     }))
-    .filter((m) => m.menuNum > 0);
+    .filter((m) => !Number.isNaN(m.menuNum) && m.menuNum > 0);
 }
 
-export default function useMenus() {
+export default function useMenus(ui: MenuUi = browserUi) {
   const [menus, setMenus] = useState<MenuSummary[]>([]);
   const [selectedMenu, setSelectedMenu] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -29,7 +47,8 @@ export default function useMenus() {
 
   /* ---------- initial selected from localStorage ---------- */
   useEffect(() => {
-    const persisted = Number(localStorage.getItem("selectedMenu") || "");
+    const persistedRaw = Number(localStorage.getItem("selectedMenu") || "");
+    const persisted = persistedRaw == null ? NaN : Number(persistedRaw);
     if (!Number.isNaN(persisted) && persisted > 0) {
       setSelectedMenu(persisted);
     }
@@ -50,7 +69,7 @@ export default function useMenus() {
         setSelectedMenu(null);
         localStorage.removeItem("selectedMenu");
       } else if (
-        !selectedMenu ||
+        selectedMenu === null ||
         !normalized.some((m) => m.menuNum === selectedMenu)
       ) {
         const next = normalized[0].menuNum;
@@ -71,7 +90,10 @@ export default function useMenus() {
 
   /* ---------- actions ---------- */
   const createMenu = useCallback(async () => {
-    const name = window.prompt("Menu name?");
+    const name = await ui.prompt("Menu name?", {
+      title: "Create Menu",
+      defaultValue: "",
+    });
     if (!name?.trim()) return;
 
     try {
@@ -95,7 +117,7 @@ export default function useMenus() {
       console.error("Create menu failed", e);
       setError("Create menu failed");
     }
-  }, []);
+  }, [ui]);
 
   const renameMenu = useCallback(
     async (nextName: string) => {
@@ -129,7 +151,10 @@ export default function useMenus() {
 
   const deleteMenu = useCallback(async () => {
     if (!selectedMenu) return;
-    if (!window.confirm("Delete this menu? This cannot be undone.")) return;
+    const ok = await ui.confirm("Delete this menu? This cannot be undone.", {
+      title: "Delete Menu",
+    });
+    if (!ok) return;
 
     try {
       await apiFetch(`/api/menus/${selectedMenu}`, { method: "DELETE" });
@@ -147,9 +172,9 @@ export default function useMenus() {
     } catch (e) {
       console.error("Delete menu failed", e);
       setError("Delete menu failed");
-      alert("Delete failed");
+      await ui.alert("Delete failed", { title: "Error" });
     }
-  }, [menus, selectedMenu]);
+  }, [menus, selectedMenu, ui]);
 
   /* ---------- persist selection ---------- */
   useEffect(() => {

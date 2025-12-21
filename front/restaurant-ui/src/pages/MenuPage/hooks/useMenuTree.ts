@@ -12,7 +12,28 @@ export type NodeDto = {
   sortOrder?: number;
 };
 
-export default function useMenuTree(selectedMenu: number | null) {
+type MenuUi = {
+  prompt: (
+    message: string,
+    options?: { title?: string; defaultValue?: string }
+  ) => Promise<string | null>;
+  confirm: (message: string, options?: { title?: string }) => Promise<boolean>;
+  alert: (message: string, options?: { title?: string }) => Promise<void>;
+};
+
+const browserUi: MenuUi = {
+  prompt: async (message, options) =>
+    window.prompt(message, options?.defaultValue) ?? null,
+  confirm: async (message) => window.confirm(message),
+  alert: async (message) => {
+    window.alert(message);
+  },
+};
+
+export default function useMenuTree(
+  selectedMenu: number | null,
+  ui: MenuUi = browserUi
+) {
   const [nodes, setNodes] = useState<MenuNode[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
@@ -75,7 +96,10 @@ export default function useMenuTree(selectedMenu: number | null) {
   async function createNode() {
     if (!selectedMenu) return;
 
-    const name = window.prompt("New category/leaf name?");
+    const name = await ui.prompt("New category/leaf name?", {
+      title: "Create Section",
+      defaultValue: "",
+    });
     if (!name?.trim()) return;
 
     const candidateParent = selectedNodeId ?? null;
@@ -101,7 +125,12 @@ export default function useMenuTree(selectedMenu: number | null) {
   async function renameNode() {
     if (!selectedMenu || !selectedNodeId) return;
     const current = selectedNode?.name ?? "";
-    const next = window.prompt("New name?", current)?.trim();
+    const next = (
+      await ui.prompt("New name?", {
+        title: "Rename Section",
+        defaultValue: current,
+      })
+    )?.trim();
     if (!next) return;
 
     try {
@@ -118,7 +147,11 @@ export default function useMenuTree(selectedMenu: number | null) {
 
   async function deleteNode() {
     if (!selectedMenu || !selectedNodeId) return;
-    if (!window.confirm("Delete this category/leaf? This cannot be undone.")) return;
+    const ok = await ui.confirm(
+      "Delete this category/leaf? This cannot be undone.",
+      { title: "Delete Section" }
+    );
+    if (!ok) return;
 
     try {
       await apiFetch(`/api/menu-nodes/${selectedNodeId}`, { method: "DELETE" });
@@ -126,7 +159,7 @@ export default function useMenuTree(selectedMenu: number | null) {
       await reloadNodesForSelectedMenu();
     } catch (e) {
       console.error("Delete node failed", e);
-      alert("Delete failed");
+      await ui.alert("Delete failed", { title: "Error" });
     }
   }
 

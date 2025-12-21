@@ -12,19 +12,30 @@ import useMenuTree from "./hooks/useMenuTree";
 import useProducts from "./hooks/useProducts";
 import useMenuItems from "./hooks/useMenuItems";
 import { apiFetch } from "../../api/api";
+import useMenuDialogs from "./components/MenuDialogs";
 
 /**
  * The main orchestration component for the Menu page.
  * Handles overall layout and interaction between panels.
  */
 export default function MenuPage() {
+  const menuDialogs = useMenuDialogs();
+  const { Dialogs } = menuDialogs;
+
   /* ---------------- State for modals ---------------- */
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isIngredientsOpen, setIsIngredientsOpen] = useState(false);
 
   /* ---------------- Custom Hooks ---------------- */
-  const { menus, selectedMenu, setSelectedMenu, createMenu, renameMenu, deleteMenu } =
-    useMenus();
+  const {
+    menus,
+    selectedMenu,
+    selectedMenuName,
+    setSelectedMenu,
+    createMenu,
+    renameMenu,
+    deleteMenu,
+  } = useMenus(menuDialogs);
 
   const {
     nodes,
@@ -34,7 +45,7 @@ export default function MenuPage() {
     createNode,
     renameNode,
     deleteNode,
-  } = useMenuTree(selectedMenu);
+  } = useMenuTree(selectedMenu, menuDialogs);
 
   const {
     search,
@@ -53,7 +64,7 @@ export default function MenuPage() {
     handleDropIntoPricing,
     saveRow,
     removeRow,
-  } = useMenuItems(selectedMenu, selectedNodeId);
+  } = useMenuItems(selectedMenu, selectedNodeId, menuDialogs);
 
   /* ---------------- UI ---------------- */
   return (
@@ -67,8 +78,13 @@ export default function MenuPage() {
           setSelectedNodeId(null);
         }}
         onCreate={createMenu}
-        onRename={() => {
-          const name = window.prompt("New name?")?.trim();
+        onRename={async () => {
+          const name = (
+            await menuDialogs.prompt("New name?", {
+              title: "Rename Menu",
+              defaultValue: selectedMenuName ?? "",
+            })
+          )?.trim();
           if (name) renameMenu(name);
         }}
         onDelete={deleteMenu}
@@ -148,6 +164,8 @@ export default function MenuPage() {
           onClose={() => setIsIngredientsOpen(false)}
         />
       )}
+
+      <Dialogs />
     </div>
   );
 }
