@@ -14,8 +14,8 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 
 // TODO: move to config/env var for real use
-const string JwtKey = "super-secret-dev-key-change-me";
-
+var JwtKey = Environment.GetEnvironmentVariable("JWT_KEY")
+?? "super-secret-dev-key-change-me"; // dev fallback only
 // JWT auth
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -40,9 +40,11 @@ builder.WebHost.UseUrls("http://0.0.0.0:8080");
 
 // connection string: env > appsettings > fallback
 var connString =
-    Environment.GetEnvironmentVariable("POSTGRES_CONNECTION") ??
-    builder.Configuration.GetConnectionString("postgres") ??
-    "Host=localhost;Port=5434;Username=postgres;Password=postgres;Database=postgres";
+    Environment.GetEnvironmentVariable("POSTGRES_CONNECTION")
+    ?? builder.Configuration.GetConnectionString("postgres")
+    ?? (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true"
+        ? "Host=db;Port=5432;Username=postgres;Password=postgres;Database=restaurantsys"
+        : "Host=localhost;Port=5434;Username=postgres;Password=postgres;Database=restaurantsys");
 
 // log target (without password)
 var csb = new NpgsqlConnectionStringBuilder(connString) { Password = null };

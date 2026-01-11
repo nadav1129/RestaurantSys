@@ -16,7 +16,9 @@ var connString =
     ?? builder.Configuration["DB"]
     ?? builder.Configuration["POSTGRES_CONNECTION"]
     ?? builder.Configuration["POSTGRES_CONNECTION_STRING"]
-    ?? "Host=localhost;Username=postgres;Password=postgres;Database=restaurantsys";
+    ?? (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true"
+        ? "Host=db;Port=5432;Username=postgres;Password=postgres;Database=restaurantsys"
+        : "Host=localhost;Port=5434;Username=postgres;Password=postgres;Database=restaurantsys");
 
 /* -------------------------------------------------
  * Services (DI)
