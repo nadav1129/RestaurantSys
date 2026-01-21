@@ -19,7 +19,7 @@ export type MenuDialogApi = {
   alert: (message: string, options?: DialogOptions) => Promise<void>;
   confirm: (message: string, options?: DialogOptions) => Promise<boolean>;
   prompt: (message: string, options?: DialogOptions) => Promise<string | null>;
-  Dialogs: () => JSX.Element | null;
+  Dialogs: () => React.JSX.Element | null;
 };
 
 export default function useMenuDialogs(): MenuDialogApi {
