@@ -4,7 +4,7 @@ import SecondaryBar from "../../components/SecondaryBar";
 import BarPage from "./BarPage";
 import HostessPage from "./HostessPage";
 import CheckerPage from "./CheckerPage";
-import InventoryPage from "../Temp/InventoryPage";
+//import InventoryPage from "../Temp/InventoryPage";
 import { apiFetch } from "../../api/api";
 import type { Station } from "../../types/index";
 
@@ -109,8 +109,8 @@ export default function ServicePage({
             {activeStation.stationType} page coming soon.
           </div>
         );
-      default:
-        return <InventoryPage />;
+      //default:
+        //return <InventoryPage />;
     }
   }
 
