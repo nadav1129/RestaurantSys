@@ -1,4 +1,3 @@
-import React from "react";
 
 type MenuSummary = { menuNum: number; name: string };
 

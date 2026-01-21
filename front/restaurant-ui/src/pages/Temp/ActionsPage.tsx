@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import DynamicList from "../../components/DynamicList";
 import DragDropList from "../../components/DragDropList";
 import type { ListItem } from "../../types";
