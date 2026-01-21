@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch } from "../../api/api";
 
 type DashboardTab = "alerts" | "tables" | "orders" | "staff";
@@ -12,7 +12,15 @@ type ShiftDto = {
   createdAt: string;
 };
 
-export default function DashboardPage() {
+type DashboardPageProps = {
+  hasActiveShift: boolean;
+  onStartShift: () => void;
+};
+
+export default function DashboardPage({
+  hasActiveShift: hasActiveShiftFromParent,
+  onStartShift,
+}: DashboardPageProps) {
   const [activeTab, setActiveTab] = useState<DashboardTab>("alerts");
 
   const [activeShift, setActiveShift] = useState<ShiftDto | null>(null);
