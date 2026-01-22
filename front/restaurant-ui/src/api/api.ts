@@ -1,5 +1,13 @@
 // front/src/api/api.ts
-export const API_BASE =  (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+const FALLBACK_LOCAL = "http://localhost:8080";
+
+export const API_BASE =
+  (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ??
+  (import.meta.env.DEV ? FALLBACK_LOCAL : "");
+
+  if (!API_BASE && !import.meta.env.DEV) {
+  throw new Error("VITE_API_BASE is missing. Set it in Amplify env vars.");
+}
 
 type ApiOptions = Omit<RequestInit, "body" | "headers"> & {
   body?: unknown;                 // allow plain objects here

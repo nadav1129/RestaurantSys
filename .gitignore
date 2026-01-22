@@ -36,3 +36,10 @@ db-data/
 *.log
 logs/
 deploy/.env
+.vs/RestaurantSys/v17/DocumentLayout.json
+.vs/ProjectEvaluation/restaurantsys.metadata.v9.bin
+.vs/ProjectEvaluation/restaurantsys.projects.v9.bin
+.vs/ProjectEvaluation/restaurantsys.strings.v9.bin
+.vs/RestaurantSys/v17/.suo
+.vs/RestaurantSys/v17/DocumentLayout.backup.json
+.vs/RestaurantSys/v17/DocumentLayout.json
