@@ -34,9 +34,7 @@ services:
     image: mcr.microsoft.com/dotnet/sdk:9.0
     container_name: rsys_api
     working_dir: /src
-    command: >
-      bash -lc "dotnet restore &&
-                dotnet watch --no-hot-reload run --urls http://0.0.0.0:8080"
+    command: ["bash","-lc","dotnet restore && dotnet run --urls http://0.0.0.0:8080"]
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       # API talks to DB by service name + container port
