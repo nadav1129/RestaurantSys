@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import SecondaryBar from "../../components/SecondaryBar";
-import BarPage from "./BarPage";
-import HostessPage from "./HostessPage";
-import CheckerPage from "./CheckerPage";
 import { apiFetch } from "../../api/api";
 import type { Station } from "../../types/index";
 import { EmptyState, PageContainer } from "../../components/ui/layout";
+import BarPage from "./BarPage";
+import CheckerPage from "./CheckerPage";
+import HostessPage from "./HostessPage";
 
 export default function ServicePage({
   activeStationId,
@@ -80,7 +80,7 @@ export default function ServicePage({
             title={stations.length === 0 ? "No stations yet" : "Choose a station"}
             description={
               stations.length === 0
-                ? "Once stations are available, they’ll appear here in the redesigned service navigation."
+                ? "Once stations are available, they will appear here in the redesigned service navigation."
                 : "Pick a station from the bar above to load its service-specific tools."
             }
           />

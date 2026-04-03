@@ -1,6 +1,11 @@
 import { useState } from "react";
 import Button from "../../components/Button";
-import { ClockIcon, OrdersIcon, ReceiptIcon, TableIcon } from "../../components/icons";
+import {
+  ClockIcon,
+  OrdersIcon,
+  ReceiptIcon,
+  TableIcon,
+} from "../../components/icons";
 
 function formatTime(d: Date | null): string {
   if (!d) return "--:--";
@@ -18,8 +23,6 @@ function formatMoney(n: number | null | undefined): string {
 type OrderInfoCardProps = {
   table: string;
   setTable: (value: string) => void;
-  tableId: string | null;
-  setTableId: (value: string | null) => void;
   guestName: string;
   setGuestName: (value: string) => void;
   diners: string;
@@ -43,8 +46,6 @@ type OrderInfoCardProps = {
 export default function OrderInfoCard({
   table,
   setTable,
-  tableId,
-  setTableId,
   guestName,
   setGuestName,
   diners,
@@ -86,21 +87,9 @@ export default function OrderInfoCard({
   return (
     <>
       <div className="rs-surface p-5 lg:p-6">
-        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_360px]">
+        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.45fr)_320px]">
           <div className="space-y-5">
-            <div className="flex flex-wrap gap-3">
-              <div className="rs-pill">
-                <TableIcon className="h-4 w-4" />
-                Table {table || "—"}
-              </div>
-              <div className="rs-pill">
-                <ClockIcon className="h-4 w-4" />
-                Start {formatTime(startTime)}
-              </div>
-              <div className="rs-pill">End {formatTime(endTime)}</div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-[minmax(150px,180px)_minmax(0,1fr)_minmax(120px,140px)]">
+            <div className="grid gap-4 sm:max-w-[420px] sm:grid-cols-[minmax(180px,1fr)_minmax(120px,150px)]">
               <label className="space-y-2">
                 <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                   Table
@@ -112,21 +101,7 @@ export default function OrderInfoCard({
                   placeholder="none"
                 />
               </label>
-              <label className="space-y-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
-                  Table ID
-                </span>
-                <input
-                  className="rs-input"
-                  value={tableId ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value.trim();
-                    setTableId(v.length ? v : null);
-                  }}
-                  placeholder="tableId (GUID)"
-                  title="Real tableId (GUID). Used for persisting the open order."
-                />
-              </label>
+
               <label className="space-y-2">
                 <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                   Diners
@@ -180,7 +155,7 @@ export default function OrderInfoCard({
             </div>
           </div>
 
-          <div className="space-y-4 rounded-[28px] border border-[var(--border)] bg-[var(--card-muted)] p-5">
+          <div className="space-y-4 rounded-[28px] border border-[var(--border)] bg-[var(--card-muted)] p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent)] text-[var(--accent-foreground)]">
                 <OrdersIcon className="h-5 w-5" />
@@ -195,15 +170,27 @@ export default function OrderInfoCard({
               </div>
             </div>
 
+            <div className="flex flex-wrap gap-2">
+              <div className="rs-pill">
+                <TableIcon className="h-4 w-4" />
+                Table {table || "--"}
+              </div>
+              <div className="rs-pill">
+                <ClockIcon className="h-4 w-4" />
+                Start {formatTime(startTime)}
+              </div>
+              <div className="rs-pill">End {formatTime(endTime)}</div>
+            </div>
+
             <div className="grid gap-3">
-              <SummaryLine label="Minimum" value={`₪${formatMoney(minimum)}`} />
-              <SummaryLine label="Total" value={`₪${formatMoney(total)}`} />
+              <SummaryLine label="Minimum" value={`NIS ${formatMoney(minimum)}`} />
+              <SummaryLine label="Total" value={`NIS ${formatMoney(total)}`} />
               <SummaryLine
                 label="Total + 10%"
-                value={`₪${formatMoney(totalWith10)}`}
+                value={`NIS ${formatMoney(totalWith10)}`}
                 strong
               />
-              <SummaryLine label="Only 10%" value={`₪${formatMoney(only10)}`} />
+              <SummaryLine label="Only 10%" value={`NIS ${formatMoney(only10)}`} />
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
@@ -255,7 +242,10 @@ export default function OrderInfoCard({
               </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setShowGuestEditor(false)}>
+              <Button
+                variant="secondary"
+                onClick={() => setShowGuestEditor(false)}
+              >
                 Cancel
               </Button>
               <Button onClick={saveGuestEditor}>Save</Button>

@@ -7,6 +7,7 @@ import {
   QuickOrderIcon,
   ServiceIcon,
   SettingsIcon,
+  SparklesIcon,
 } from "./icons";
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
@@ -23,6 +24,11 @@ export const pageMeta: Record<
     title: "Shift Hub",
     description: "Device setup, staff shift control, and the nightly brief in one place.",
     icon: HomeIcon,
+  },
+  assistant: {
+    title: "AI Assistant",
+    description: "A dedicated assistant workspace for service guidance, drafting, and operational support.",
+    icon: SparklesIcon,
   },
   service: {
     title: "Service Stations",
@@ -63,6 +69,7 @@ export const primaryNav: Array<{
 }> = [
   { key: "home", label: "Home", icon: HomeIcon },
   { key: "service", label: "Service", icon: ServiceIcon },
+  { key: "assistant", label: "AI", icon: SparklesIcon },
   { key: "management", label: "Management", icon: ManagementIcon },
   { key: "settings", label: "Settings", icon: SettingsIcon },
 ];

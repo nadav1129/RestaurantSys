@@ -6,6 +6,7 @@ import ActionsPage from "./pages/Temp/ActionsPage";
 import EmptyPage from "./pages/EmptyPage";
 import OrderPage from "./pages/OrderPage/OrderPage";
 import LandingPage from "./pages/LandingPage";
+import ChatAssistantPage from "./pages/Service/ChatAssistantPage";
 import ServicePage from "./pages/Service/ServicePage";
 import ManagementPage from "./pages/Management/ManagementPage";
 import SettingsPage from "./pages/SettingsPage";
@@ -28,6 +29,8 @@ export default function App() {
     switch (page) {
       case "home":
         return <HomePage />;
+      case "assistant":
+        return <ChatAssistantPage />;
       case "login":
         return <LoginPage onBackToUserLogin={() => setPage("home")} />;
       case "actions":

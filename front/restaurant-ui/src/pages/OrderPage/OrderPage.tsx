@@ -414,7 +414,7 @@ export default function OrderPage({
   function CategorySidebar() {
     if (!path.length) {
       return (
-        <div className="rounded-2xl ring-1 ring-gray-200 bg-white p-4 shadow-sm text-sm text-gray-500">
+        <div className="rs-surface p-4 text-sm text-[var(--muted-foreground)]">
           No menu.
         </div>
       );
@@ -422,19 +422,19 @@ export default function OrderPage({
     const node = current!;
     const children = node?.children ?? [];
     return (
-      <div className="rounded-2xl ring-1 ring-gray-200 bg-white shadow-sm overflow-hidden">
-        <div className="bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700">
+      <div className="rs-surface h-full overflow-hidden">
+        <div className="border-b border-[var(--border)] bg-[var(--card-muted)] px-4 py-3 text-sm font-medium text-[var(--foreground)]">
           {node?.name ?? "Menu"}
         </div>
-        <div className="p-3">
+        <div className="p-4">
           {children.length === 0 ? (
-            <div className="text-xs text-gray-500">No sub-categories.</div>
+            <div className="text-xs text-[var(--muted-foreground)]">No sub-categories.</div>
           ) : (
             <ul className="space-y-1">
               {children.map((c) => (
                 <li key={c.id}>
                   <button
-                    className="w-full rounded-xl px-3 py-2 text-left ring-1 ring-transparent hover:ring-gray-200 hover:bg-gray-50 transition"
+                    className="w-full rounded-2xl border border-transparent px-3 py-2.5 text-left text-[var(--foreground)] transition hover:border-[var(--border)] hover:bg-[var(--card-muted)]"
                     onClick={() => enterNode(c)}
                   >
                     {c.name}
@@ -445,7 +445,7 @@ export default function OrderPage({
           )}
           {path.length > 1 && (
             <button
-              className="mt-3 w-full rounded-xl px-3 py-2 text-sm ring-1 ring-gray-200 hover:bg-gray-50 transition"
+              className="mt-3 w-full rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm text-[var(--foreground)] transition hover:bg-[var(--muted)]"
               onClick={goUpOne}
             >
               ← Up one
@@ -458,12 +458,10 @@ export default function OrderPage({
 
   /* ===== Render (Left items | Center content | Right categories) ===== */
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-4">
+    <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-6 px-4 py-4 lg:px-6">
       <OrderInfoCard
         table={table}
         setTable={setTable}
-        tableId={tableId}
-        setTableId={setTableId}
         guestName={guestName}
         setGuestName={setGuestName}
         diners={diners}
@@ -484,38 +482,40 @@ export default function OrderPage({
         hasConfirmedItems={hasConfirmed}
       />
 
-      {/* EXACT column structure: left | center | right */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(280px,1fr)_minmax(500px,2fr)_minmax(280px,1fr)]">
-        {/* LEFT: Order items */}
-        <OrderItems cart={cart} onRemove={removeCartItem} />
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)_minmax(300px,340px)]">
+        <div className="xl:row-span-2 2xl:row-span-1">
+          <OrderItems cart={cart} onRemove={removeCartItem} />
+        </div>
 
-        {/* CENTER: either product grid or item details */}
-        {mode === "details" && selectedProduct ? (
-          <ItemDetails
-            product={selectedProduct}
-            qty={customQty}
-            setQty={setCustomQty}
-            notes={customNotes}
-            setNotes={setCustomNotes}
-            adds={customAdds}
-            setAdds={setCustomAdds}
-            onCancel={() => {
-              setMode("browse");
-              setSelectedProduct(null);
-            }}
-            onAdd={addToCart}
-          />
-        ) : (
-          <OrderMenu
-            path={path}
-            current={current}
-            products={products}
-            onPickProduct={onPickProduct}
-          />
-        )}
+        <div className="min-w-0">
+          {mode === "details" && selectedProduct ? (
+            <ItemDetails
+              product={selectedProduct}
+              qty={customQty}
+              setQty={setCustomQty}
+              notes={customNotes}
+              setNotes={setCustomNotes}
+              adds={customAdds}
+              setAdds={setCustomAdds}
+              onCancel={() => {
+                setMode("browse");
+                setSelectedProduct(null);
+              }}
+              onAdd={addToCart}
+            />
+          ) : (
+            <OrderMenu
+              path={path}
+              current={current}
+              products={products}
+              onPickProduct={onPickProduct}
+            />
+          )}
+        </div>
 
-        {/* RIGHT: Category sidebar */}
-        <CategorySidebar />
+        <div className="min-w-0">
+          <CategorySidebar />
+        </div>
       </div>
     </div>
   );

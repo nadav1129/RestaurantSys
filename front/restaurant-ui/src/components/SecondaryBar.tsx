@@ -5,12 +5,14 @@ type Item = { id: string; label: string };
 
 export default function SecondaryBar({
   title,
+  description,
   items,
   activeId,
   onChange,
   topOffsetClass = "top-0",
 }: {
   title?: string;
+  description?: string;
   items: Item[];
   activeId?: string;
   onChange: (id: string) => void;
@@ -35,7 +37,7 @@ export default function SecondaryBar({
               </div>
             ) : null}
             <div className="text-xs text-[var(--muted-foreground)]">
-              Switch stations without leaving the current service workspace.
+              {description ?? "Switch stations without leaving the current service workspace."}
             </div>
           </div>
         </div>

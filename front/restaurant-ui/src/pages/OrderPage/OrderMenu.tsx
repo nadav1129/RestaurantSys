@@ -46,7 +46,7 @@ export default function OrderMenu({
         </div>
       ) : (
         <div className="rounded-[26px] border border-dashed border-[var(--border-strong)] bg-[var(--card-muted)] p-6 text-sm text-[var(--muted-foreground)]">
-          Choose a category on the right to see products.
+          Choose a category to see products.
         </div>
       )}
     </div>
