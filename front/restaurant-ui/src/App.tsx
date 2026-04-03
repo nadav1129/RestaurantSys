@@ -5,34 +5,31 @@ import LoginPage from "./pages/LoginPage";
 import ActionsPage from "./pages/Temp/ActionsPage";
 import EmptyPage from "./pages/EmptyPage";
 import OrderPage from "./pages/OrderPage/OrderPage";
+import LandingPage from "./pages/LandingPage";
 import ServicePage from "./pages/Service/ServicePage";
 import ManagementPage from "./pages/Management/ManagementPage";
+import SettingsPage from "./pages/SettingsPage";
 import type { Page } from "./types";
 
 export default function App() {
+  const [hasEnteredApp, setHasEnteredApp] = useState(false);
   const [page, setPage] = useState<Page>("home");
-
-  // station selection lives only in ServicePage
-  const [activeStationId, setActiveStationId] = useState<string | undefined>(undefined);
-
-  // when a station page asks to open a specific table’s order
+  const [activeStationId, setActiveStationId] = useState<string | undefined>(
+    undefined
+  );
   const [currentTable, setCurrentTable] = useState<string>("none");
+
   const openOrderForTable = (tableId: string) => {
     setCurrentTable(tableId);
     setPage("order");
   };
-
 
   const renderPage = () => {
     switch (page) {
       case "home":
         return <HomePage />;
       case "login":
-        return (
-        <LoginPage
-          onBackToUserLogin={() => setPage("home")}
-        />
-      );
+        return <LoginPage onBackToUserLogin={() => setPage("home")} />;
       case "actions":
         return <ActionsPage />;
       case "service":
@@ -44,19 +41,19 @@ export default function App() {
           />
         );
       case "order":
-        // If you want OrderPage to receive the chosen table, add a prop there and pass it:
-        // return <OrderPage table={currentTable} />;
         return <OrderPage />;
       case "settings":
-        // You don’t have SettingsPage yet; using EmptyPage as a placeholder
-        return <EmptyPage />;
-        case "management":
-        // 
+        return <SettingsPage />;
+      case "management":
         return <ManagementPage />;
       default:
         return <EmptyPage />;
     }
   };
+
+  if (!hasEnteredApp) {
+    return <LandingPage onContinue={() => setHasEnteredApp(true)} />;
+  }
 
   return (
     <Shell

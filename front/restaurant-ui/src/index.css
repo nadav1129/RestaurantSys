@@ -1,1 +1,283 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
+
+:root {
+  --font-sans: "Manrope", "IBM Plex Sans", ui-sans-serif, sans-serif;
+  --font-display: "IBM Plex Sans", "Manrope", ui-sans-serif, sans-serif;
+  --background: #f3f6fb;
+  --background-soft: #eef3fb;
+  --foreground: #132033;
+  --muted: #e8edf6;
+  --muted-foreground: #5f6f86;
+  --card: rgba(255, 255, 255, 0.88);
+  --card-muted: rgba(248, 250, 253, 0.95);
+  --border: #d7e0ed;
+  --border-strong: #c0cbdd;
+  --primary: #2458d3;
+  --primary-foreground: #f8fbff;
+  --accent: #dde8ff;
+  --accent-foreground: #16367c;
+  --destructive: #d95757;
+  --destructive-foreground: #fff8f8;
+  --success: #238b68;
+  --success-soft: rgba(35, 139, 104, 0.22);
+  --success-surface: rgba(35, 139, 104, 0.09);
+  --warning: #d38a1f;
+  --warning-soft: rgba(211, 138, 31, 0.26);
+  --warning-surface: rgba(211, 138, 31, 0.12);
+  --ring: rgba(36, 88, 211, 0.32);
+  --shadow-soft: 0 10px 24px rgba(16, 24, 40, 0.08);
+  --shadow-strong: 0 18px 40px rgba(36, 88, 211, 0.14);
+}
+
+:root[data-theme="dark"] {
+  --background: #0f1728;
+  --background-soft: #111d33;
+  --foreground: #e6eef9;
+  --muted: #182438;
+  --muted-foreground: #93a7c3;
+  --card: rgba(18, 28, 46, 0.9);
+  --card-muted: rgba(22, 34, 56, 0.96);
+  --border: #26354c;
+  --border-strong: #31425b;
+  --primary: #84a7ff;
+  --primary-foreground: #10203f;
+  --accent: #1f3259;
+  --accent-foreground: #d6e4ff;
+  --destructive: #f47b7b;
+  --destructive-foreground: #240c10;
+  --success: #55c2a0;
+  --success-soft: rgba(85, 194, 160, 0.26);
+  --success-surface: rgba(85, 194, 160, 0.1);
+  --warning: #f2b75f;
+  --warning-soft: rgba(242, 183, 95, 0.24);
+  --warning-surface: rgba(242, 183, 95, 0.1);
+  --ring: rgba(132, 167, 255, 0.28);
+  --shadow-soft: 0 12px 30px rgba(2, 6, 23, 0.32);
+  --shadow-strong: 0 24px 48px rgba(2, 6, 23, 0.44);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background:
+      radial-gradient(circle at top left, rgba(132, 167, 255, 0.16), transparent 34%),
+      radial-gradient(circle at top right, rgba(53, 104, 221, 0.1), transparent 28%),
+      linear-gradient(180deg, var(--background-soft), var(--background));
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .rs-eyebrow {
+    color: var(--muted-foreground);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+
+  .rs-surface {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 1.75rem;
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(18px);
+  }
+
+  .rs-surface-muted {
+    background: var(--card-muted);
+    border: 1px solid var(--border);
+    border-radius: 1.5rem;
+  }
+
+  .rs-kpi {
+    background: var(--card-muted);
+    border: 1px solid var(--border);
+    border-radius: 1.4rem;
+    padding: 1rem;
+  }
+
+  .rs-input,
+  .rs-select,
+  .rs-textarea {
+    width: 100%;
+    border: 1px solid var(--border);
+    background: var(--card-muted);
+    color: var(--foreground);
+    border-radius: 1rem;
+    padding: 0.75rem 0.95rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  }
+
+  .rs-input::placeholder,
+  .rs-textarea::placeholder {
+    color: var(--muted-foreground);
+  }
+
+  .rs-input:focus,
+  .rs-select:focus,
+  .rs-textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px var(--ring);
+  }
+
+  .rs-action-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    border: 1px solid var(--border);
+    background: var(--card-muted);
+    border-radius: 1.5rem;
+    padding: 0.9rem;
+  }
+
+  .rs-empty-state {
+    border: 1px dashed var(--border-strong);
+    background: var(--card-muted);
+    border-radius: 1.5rem;
+    padding: 2rem;
+  }
+
+  .rs-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .rs-table thead th {
+    color: var(--muted-foreground);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    padding: 0.9rem 1rem;
+    text-transform: uppercase;
+  }
+
+  .rs-table tbody tr {
+    background: transparent;
+    transition: background-color 0.2s ease;
+  }
+
+  .rs-table tbody tr:hover {
+    background: color-mix(in srgb, var(--accent) 32%, transparent);
+  }
+
+  .rs-table tbody td {
+    border-top: 1px solid var(--border);
+    padding: 0.95rem 1rem;
+    vertical-align: top;
+  }
+
+  .rs-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card-muted);
+    color: var(--muted-foreground);
+    padding: 0.45rem 0.8rem;
+    font-size: 0.76rem;
+    font-weight: 600;
+  }
+
+  .rs-overlay {
+    background: rgba(15, 23, 42, 0.48);
+    backdrop-filter: blur(16px);
+  }
+
+  .rs-modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 1.6rem;
+    box-shadow: var(--shadow-strong);
+    backdrop-filter: blur(18px);
+  }
+}
+
+@layer utilities {
+  .bg-app {
+    background: linear-gradient(180deg, var(--background-soft), var(--background));
+  }
+}
+
+:root[data-theme="dark"] .bg-white {
+  background-color: var(--card) !important;
+}
+
+:root[data-theme="dark"] .bg-gray-50 {
+  background-color: var(--card-muted) !important;
+}
+
+:root[data-theme="dark"] .bg-gray-100 {
+  background-color: var(--muted) !important;
+}
+
+:root[data-theme="dark"] .bg-gray-900,
+:root[data-theme="dark"] .bg-black {
+  background-color: var(--primary) !important;
+}
+
+:root[data-theme="dark"] .border-gray-100,
+:root[data-theme="dark"] .border-gray-200,
+:root[data-theme="dark"] .border-gray-300,
+:root[data-theme="dark"] .border-gray-700,
+:root[data-theme="dark"] .border-gray-800 {
+  border-color: var(--border) !important;
+}
+
+:root[data-theme="dark"] .text-gray-900,
+:root[data-theme="dark"] .text-gray-800,
+:root[data-theme="dark"] .text-gray-700 {
+  color: var(--foreground) !important;
+}
+
+:root[data-theme="dark"] .text-gray-600,
+:root[data-theme="dark"] .text-gray-500,
+:root[data-theme="dark"] .text-gray-400,
+:root[data-theme="dark"] .text-gray-300,
+:root[data-theme="dark"] .text-gray-200 {
+  color: var(--muted-foreground) !important;
+}
+
+:root[data-theme="dark"] .hover\:bg-gray-50:hover,
+:root[data-theme="dark"] .hover\:bg-gray-100:hover,
+:root[data-theme="dark"] .hover\:bg-gray-200:hover {
+  background-color: var(--muted) !important;
+}
+
+:root[data-theme="dark"] .hover\:bg-black:hover,
+:root[data-theme="dark"] .hover\:bg-gray-900:hover {
+  background-color: color-mix(in srgb, var(--primary) 90%, white 10%) !important;
+}

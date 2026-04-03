@@ -36,8 +36,8 @@ export default function useProducts(selectedNodeId: string | null) {
         }
 
         const q = search.trim();
-        const base = '/api/products?menuNodeId=${encodeURIComponent(selectedNodeId)}';
-        const url = q ? '${base}&search=${encodeURIComponent(q)}' : base;
+        const base = `/api/products?menuNodeId=${encodeURIComponent(selectedNodeId)}`;
+        const url = q ? `${base}&search=${encodeURIComponent(q)}` : base;
 
         const data = await apiFetch(url);
         if (!cancelled) {
@@ -89,7 +89,7 @@ async function fetchProductsForNode(nodeId: string | null) {
 
 
   async function linkProductToNode(productId: string, nodeId: string) {
-    await apiFetch('/api/menu-nodes/${nodeId}/products', {
+    await apiFetch(`/api/menu-nodes/${nodeId}/products`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: { productId },

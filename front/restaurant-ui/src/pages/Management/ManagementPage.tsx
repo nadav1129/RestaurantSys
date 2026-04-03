@@ -1,175 +1,96 @@
-import React, { useState } from "react";
-import MenuPage from "./../MenuPage/MenuPage";
-import SpeedPage from "../Temp/SpeedPage";
+import { useState } from "react";
+import MenuPage from "../MenuPage/MenuPage";
 import ManagementSettingsPage from "./ManagementSettingsPage";
-import StationsPage from "./../StationsPage/StationsPage";
+import StationsPage from "../StationsPage/StationsPage";
 import ListsPage from "../Service/Lists/ListsPage";
 import DashboardPage from "./DashboardPage";
 import StaffPage from "./StaffPage";
+import AnalyticsPage from "./AnalyticsPage";
+import {
+  AnalyticsIcon,
+  ListsIcon,
+  ManagementIcon,
+  MenuIcon,
+  SettingsIcon,
+  StaffIcon,
+  StationsIcon,
+} from "../../components/icons";
+import { PageContainer, PageHeader } from "../../components/ui/layout";
+import { cn } from "../../lib/utils";
+
+const tabs = [
+  { id: "dashboard", label: "Dashboard", icon: ManagementIcon },
+  { id: "analytics", label: "Analytics", icon: AnalyticsIcon },
+  { id: "menu", label: "Menu Builder", icon: MenuIcon },
+  { id: "stations", label: "Stations", icon: StationsIcon },
+  { id: "lists", label: "Lists", icon: ListsIcon },
+  { id: "staff", label: "Staff", icon: StaffIcon },
+  { id: "settings", label: "Settings", icon: SettingsIcon },
+] as const;
+
+type ManagementTab = (typeof tabs)[number]["id"];
 
 export default function ManagementPage() {
-  /* which sub-view is active? "menu" | "speed" */
-  const [activeTab, setActiveTab] = useState<
-    "dashboard" | "menu" | "stations" | "lists" | "staff" | "settings"
-  >("dashboard");
-
+  const [activeTab, setActiveTab] = useState<ManagementTab>("dashboard");
   const [hasActiveShift, setHasActiveShift] = useState(false);
 
   const handleStartShift = () => {
-    // TODO: call API to start shift
     setHasActiveShift(true);
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
-      {/* Header */}
-      <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-        <div>
-          <div className="text-sm font-medium text-gray-500">Management</div>
-          <div className="text-2xl font-semibold tracking-tight text-gray-900">
-            Control Panel
+    <PageContainer className="space-y-6">
+      <PageHeader
+        eyebrow="Management"
+        title="Operations Center"
+        description="A calmer control surface for shift oversight, menu structure, staffing, and restaurant configuration."
+        actions={
+          <div className="rs-pill">
+            {hasActiveShift ? "Shift active" : "Shift not started"}
           </div>
-          <div className="mt-1 text-sm text-gray-500">
-            Configure menu, bottles, and defaults.
-          </div>
+        }
+      />
+
+      <section className="rs-surface p-3">
+        <div className="flex flex-wrap gap-2">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition",
+                  active
+                    ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
+                    : "border-[var(--border)] bg-[var(--card-muted)] text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                )}
+              >
+                <Icon className="h-4.5 w-4.5" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
+      </section>
 
-        {/* Tabs / actions */}
-        <div className="flex items-center gap-2">
-        <button
-            onClick={() => setActiveTab("dashboard")}
-            className={[
-              "rounded-xl border px-3 py-2 text-sm font-medium",
-              activeTab === "dashboard"
-                ? "border-gray-900 bg-gray-900 text-white"
-                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
-            ].join(" ")}
-          >
-            Dashboard
-          </button>
-
-          <button
-            onClick={() => setActiveTab("menu")}
-            className={[
-              "rounded-xl border px-3 py-2 text-sm font-medium",
-              activeTab === "menu"
-                ? "border-gray-900 bg-gray-900 text-white"
-                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
-            ].join(" ")}
-          >
-            Menu Builder
-          </button>
-
-          {/* <button
-            onClick={() => setActiveTab("speed")}
-            className={[
-              "rounded-xl border px-3 py-2 text-sm font-medium",
-              activeTab === "speed"
-                ? "border-gray-900 bg-gray-900 text-white"
-                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
-            ].join(" ")}
-          >
-            Speed Rail
-          </button> */}
-
-          <button
-            onClick={() => setActiveTab("stations")}
-            className={[
-              "rounded-xl border px-3 py-2 text-sm font-medium",
-              activeTab === "stations"
-                ? "border-gray-900 bg-gray-900 text-white"
-                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
-            ].join(" ")}
-          >
-            Stations
-          </button>
-
-           <button
-            onClick={() => setActiveTab("lists")}
-            className={[
-              "rounded-xl border px-3 py-2 text-sm font-medium",
-              activeTab === "lists"
-                ? "border-gray-900 bg-gray-900 text-white"
-                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
-            ].join(" ")}
-          >
-            Lists
-          </button>
-
-          <button
-            onClick={() => setActiveTab("staff")}
-            className={[
-              "rounded-xl border px-3 py-2 text-sm font-medium",
-              activeTab === "staff"
-                ? "border-gray-900 bg-gray-900 text-white"
-                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
-            ].join(" ")}
-          >
-            Staff
-          </button>
-
-          <button
-            onClick={() => setActiveTab("settings")}
-            className={[
-              "rounded-xl border px-3 py-2 text-sm font-medium",
-              activeTab === "settings"
-                ? "border-gray-900 bg-gray-900 text-white"
-                : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
-            ].join(" ")}
-          >
-            Settings
-          </button>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-
+      <div className="space-y-6">
         {activeTab === "dashboard" && (
-          <div className="rounded-xl border border-gray-200 bg-gray-100">
-            <DashboardPage 
+          <DashboardPage
             hasActiveShift={hasActiveShift}
             onStartShift={handleStartShift}
-            />
-          </div>
+          />
         )}
 
-        {activeTab === "menu" && (
-          <div className="rounded-xl border border-gray-200 bg-gray-100">
-            <MenuPage />
-          </div>
-        )}
-
-        {/* {activeTab === "speed" && (
-          <div className="rounded-xl border border-gray-200 bg-white">
-            <SpeedPage />
-          </div>
-        )} */}
-
-        {activeTab === "stations" && (
-          <div className="rounded-xl border border-gray-200 bg-white">
-            <StationsPage />
-          </div>
-        )}
-
-        {activeTab === "lists" && (
-          <div className="rounded-xl border border-gray-200 bg-white">
-            <ListsPage />
-          </div>
-        )}
-
-        {activeTab === "staff" && (
-          <div className="rounded-xl border border-gray-200 bg-white">
-            <StaffPage />
-          </div>
-        )}
-
-        {activeTab === "settings" && (
-          <div className="rounded-xl border border-gray-200 bg-white">
-            <ManagementSettingsPage />
-          </div>
-        )}
+        {activeTab === "analytics" && <AnalyticsPage />}
+        {activeTab === "menu" && <MenuPage />}
+        {activeTab === "stations" && <StationsPage />}
+        {activeTab === "lists" && <ListsPage />}
+        {activeTab === "staff" && <StaffPage />}
+        {activeTab === "settings" && <ManagementSettingsPage />}
       </div>
-    </div>
+    </PageContainer>
   );
 }

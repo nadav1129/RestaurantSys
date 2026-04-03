@@ -1,4 +1,5 @@
 import React from "react";
+import { FolderTreeIcon } from "./icons";
 
 export interface MenuNode {
   id: string;
@@ -38,20 +39,25 @@ export default function MenuTree({
     const isSelected = node.id === selectedNodeId;
     const hasChildren = !!(node.children && node.children.length);
 
-    return (
+   return (
       <div key={node.id} className="mb-1">
         <button
           type="button" // <- safety
           className={[
-            "flex w-full items-start rounded-lg px-2 py-1 text-left text-sm",
-            isSelected ? "bg-gray-900 text-white" : "hover:bg-gray-100 text-gray-800",
+            "flex w-full items-start rounded-2xl border px-3 py-3 text-left text-sm transition",
+            isSelected
+              ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
+              : "border-transparent text-[var(--foreground)] hover:border-[var(--border)] hover:bg-[var(--card)]",
           ].join(" ")}
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
+          style={{ paddingLeft: `${depth * 14 + 14}px` }}
           onClick={() => onSelectNode(isSelected ? null : node.id)} // <- toggle to root
         >
+          <div className="mr-3 mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white/55 text-current">
+            <FolderTreeIcon className="h-4 w-4" />
+          </div>
           <div className="flex flex-col">
             <span className="font-medium leading-none">{node.name}</span>
-            <span className="text-[10px] font-normal leading-none text-gray-500">
+            <span className="mt-2 text-[11px] font-normal leading-none text-[var(--muted-foreground)]">
               {hasChildren ? "Category" : "Leaf (products live here)"}
             </span>
           </div>

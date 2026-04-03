@@ -1,32 +1,24 @@
-﻿import React, { useState } from "react";
+import { useState } from "react";
 import AddProductModal from "../../components/AddProductModal";
 import IngredientManager from "../../components/ingredient_manager";
-
 import MenuTopBar from "./panels/MenuTopBar";
 import ProductCatalogPanel from "./panels/ProductCatalogPanel";
 import MenuStructurePanel from "./panels/MenuStructurePanel";
 import MenuPricingPanel from "./panels/MenuPricingPanel";
-
 import useMenus from "./hooks/useMenus";
 import useMenuTree from "./hooks/useMenuTree";
 import useProducts from "./hooks/useProducts";
 import useMenuItems from "./hooks/useMenuItems";
 import { apiFetch } from "../../api/api";
 import useMenuDialogs from "./components/MenuDialogs";
+import { SectionCard } from "../../components/ui/layout";
 
-/**
- * The main orchestration component for the Menu page.
- * Handles overall layout and interaction between panels.
- */
 export default function MenuPage() {
   const menuDialogs = useMenuDialogs();
   const { Dialogs } = menuDialogs;
-
-  /* ---------------- State for modals ---------------- */
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isIngredientsOpen, setIsIngredientsOpen] = useState(false);
 
-  /* ---------------- Custom Hooks ---------------- */
   const {
     menus,
     selectedMenu,
@@ -53,7 +45,7 @@ export default function MenuPage() {
     catalog,
     onDragStartProduct,
     fetchProductsForNode,
-    fetchAllProducts, 
+    fetchAllProducts,
   } = useProducts(selectedNodeId);
 
   const {
@@ -66,31 +58,34 @@ export default function MenuPage() {
     removeRow,
   } = useMenuItems(selectedMenu, selectedNodeId, menuDialogs);
 
-  /* ---------------- UI ---------------- */
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
-      {/* Top bar: select/create/edit/delete menu */}
-      <MenuTopBar
-        menus={menus}
-        selectedMenu={selectedMenu}
-        onSelect={(menuNum) => {
-          setSelectedMenu(menuNum);
-          setSelectedNodeId(null);
-        }}
-        onCreate={createMenu}
-        onRename={async () => {
-          const name = (
-            await menuDialogs.prompt("New name?", {
-              title: "Rename Menu",
-              defaultValue: selectedMenuName ?? "",
-            })
-          )?.trim();
-          if (name) renameMenu(name);
-        }}
-        onDelete={deleteMenu}
-      />
-      {/* Two panels: Product Catalog + Menu Structure */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div className="space-y-6">
+      <SectionCard
+        title="Menu Builder"
+        description="Manage menu sets, product search, structure, and pricing from one quieter workspace."
+      >
+        <MenuTopBar
+          menus={menus}
+          selectedMenu={selectedMenu}
+          onSelect={(menuNum) => {
+            setSelectedMenu(menuNum);
+            setSelectedNodeId(null);
+          }}
+          onCreate={createMenu}
+          onRename={async () => {
+            const name = (
+              await menuDialogs.prompt("New name?", {
+                title: "Rename Menu",
+                defaultValue: selectedMenuName ?? "",
+              })
+            )?.trim();
+            if (name) renameMenu(name);
+          }}
+          onDelete={deleteMenu}
+        />
+      </SectionCard>
+
+      <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
         <ProductCatalogPanel
           search={search}
           setSearch={setSearch}
@@ -112,7 +107,6 @@ export default function MenuPage() {
         />
       </div>
 
-      {/* Pricing panel */}
       <MenuPricingPanel
         menuName={menus.find((m) => m.menuNum === selectedMenu)?.name ?? "—"}
         sectionLabel={selectedNode ? `Section: ${selectedNode.name}` : "Root"}
@@ -125,19 +119,17 @@ export default function MenuPage() {
         removeRow={removeRow}
       />
 
-      {/* ---------- Modals ---------- */}
       {isAddOpen && (
         <AddProductModal
           onClose={() => setIsAddOpen(false)}
           onSave={async (p) => {
             try {
-              // Create product
-              const resp = await apiFetch("/api/products", {
+              await apiFetch("/api/products", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: {
                   name: p.name,
-                  type: p.isBottleOnly? "bottle" : p.productType,
+                  type: p.isBottleOnly ? "bottle" : p.productType,
                   soldAsBottleOnly: !!p.isBottleOnly,
                   menuNodeId: null,
                   components: p.lines.map((l) => ({
@@ -148,7 +140,7 @@ export default function MenuPage() {
                   })),
                 },
               });
-              await fetchAllProducts(); 
+              await fetchAllProducts();
               await fetchProductsForNode(selectedNodeId);
               setIsAddOpen(false);
             } catch (err) {

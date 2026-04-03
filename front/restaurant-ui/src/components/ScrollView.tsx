@@ -2,9 +2,9 @@ import React from "react";
 
 
 export default function ScrollView({ children }: { children: React.ReactNode }) {
-return (
-<div className="h-[calc(100vh-57px)] w-full overflow-auto bg-gradient-to-b from-white to-gray-50">
-{children}
-</div>
-);
+  return (
+    <div className="min-h-0 flex-1 overflow-auto bg-transparent">
+      <div className="min-h-full">{children}</div>
+    </div>
+  );
 }

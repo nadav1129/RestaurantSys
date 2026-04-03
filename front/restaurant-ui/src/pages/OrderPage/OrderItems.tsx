@@ -1,5 +1,3 @@
-// src/pages/OrderPage/OrderItems.tsx
-import React from "react";
 import type { CartItem } from "./OrderPage";
 
 type OrderItemsProps = {
@@ -9,45 +7,58 @@ type OrderItemsProps = {
 
 export default function OrderItems({ cart, onRemove }: OrderItemsProps) {
   return (
-    <div className="rounded-2xl ring-1 ring-gray-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 text-sm font-medium text-gray-700">Items</div>
+    <div className="rs-surface h-full p-5 lg:p-6">
+      <div className="mb-4 text-lg font-semibold text-[var(--foreground)]">
+        Items
+      </div>
 
       {cart.length === 0 ? (
-        <div className="py-8 text-center text-sm text-gray-400">No items yet.</div>
+        <div className="rounded-[26px] border border-dashed border-[var(--border-strong)] bg-[var(--card-muted)] py-10 text-center text-sm text-[var(--muted-foreground)]">
+          No items yet.
+        </div>
       ) : (
-        <ul className="divide-y divide-gray-100">
+        <ul className="space-y-3">
           {cart.map((c, idx) => (
-            <li key={`${c.id}-${idx}`} className="py-3">
+            <li
+              key={`${c.id}-${idx}`}
+              className="rounded-[24px] border border-[var(--border)] bg-[var(--card-muted)] p-4"
+            >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="font-medium text-gray-800">
+                  <div className="font-medium text-[var(--foreground)]">
                     {c.qty}× {c.name}
                   </div>
-                  {c.additions.length > 0 && (
-                    <div className="text-xs text-gray-500">+ {c.additions.join(", ")}</div>
-                  )}
-                  {c.notes && <div className="text-xs text-gray-500">“{c.notes}”</div>}
+                  {c.additions.length > 0 ? (
+                    <div className="mt-2 text-sm text-[var(--muted-foreground)]">
+                      + {c.additions.join(", ")}
+                    </div>
+                  ) : null}
+                  {c.notes ? (
+                    <div className="mt-1 text-sm text-[var(--muted-foreground)]">
+                      “{c.notes}”
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="flex items-center gap-2">
                   <span
-                    className={`rounded-full px-2 py-0.5 text-xs ${
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
                       c.status === "confirmed"
-                        ? "bg-green-100 text-green-700 ring-1 ring-green-200"
-                        : "bg-amber-100 text-amber-800 ring-1 ring-amber-200"
+                        ? "bg-[var(--success-surface)] text-[var(--success)]"
+                        : "bg-[var(--warning-surface)] text-[var(--warning)]"
                     }`}
                   >
                     {c.status}
                   </span>
 
-                  {c.status === "pending" && (
+                  {c.status === "pending" ? (
                     <button
-                      className="rounded-xl px-2 py-1 text-sm ring-1 ring-gray-200 hover:bg-gray-50"
+                      className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
                       onClick={() => onRemove(idx)}
                     >
-                      remove
+                      Remove
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </li>

@@ -30,7 +30,7 @@
   </ItemGroup>
 
 <ItemGroup>
-  <Content Include="sql\schema.sql">
+  <Content Include="sql\*.sql">
     <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
   </Content>
 </ItemGroup>

@@ -1,6 +1,7 @@
-// File: src/pages/StationServicePage.tsx
-import React, { useState } from "react";
+import { useState } from "react";
 import Button from "../components/Button";
+import { OrdersIcon, TableIcon } from "../components/icons";
+import { PageContainer, SectionCard, StatCard } from "../components/ui/layout";
 import type { TableInfo, InventoryItem, Station } from "../types";
 import { formatMoney } from "../utils/money";
 
@@ -18,88 +19,101 @@ export default function StationServicePage({
   const [showInv, setShowInv] = useState(false);
 
   return (
-    <div className="mx-auto max-w-[1400px] px-4 py-4">
-      {/* Top bar */}
-      <div className="mb-4 flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-4">
-        <div className="text-lg font-semibold">
-          {station.stationType} — {station.stationName} Service
+    <PageContainer className="space-y-6">
+      <SectionCard
+        title={`${station.stationType} · ${station.stationName}`}
+        description="A calmer station view for table scanning, order opening, and inventory awareness."
+        actions={
+          <Button variant="secondary" onClick={() => setShowInv((value) => !value)}>
+            {showInv ? "Hide Inventory" : "Show Inventory"}
+          </Button>
+        }
+      >
+        <div className="grid gap-4 md:grid-cols-3">
+          <StatCard label="Tables" value={tables.length} hint="Available service points in this station." />
+          <StatCard label="Inventory Items" value={inventory.length} hint="Quick view of what this station keeps on hand." />
+          <StatCard label="Open Orders" value="Live" hint="Open a table card below to continue the workflow." />
         </div>
+      </SectionCard>
 
-        <Button variant="secondary" onClick={() => setShowInv((v) => !v)}>
-          {showInv ? "Hide Inventory" : `Show ${station.stationName} Inventory`}
-        </Button>
-      </div>
-
-      {/* Inventory panel */}
-      {showInv && (
-        <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="mb-3 text-sm font-semibold">Inventory</div>
+      {showInv ? (
+        <SectionCard title="Inventory" description="A cleaner snapshot of station-side inventory.">
           {inventory.length === 0 ? (
-            <div className="text-sm text-gray-400">No items yet.</div>
+            <div className="text-sm text-[var(--muted-foreground)]">No inventory items yet.</div>
           ) : (
-            <ul className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {inventory.map((it) => (
-                <li
-                  key={it.id}
-                  className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
-                >
-                  <span className="truncate">{it.name}</span>
-                  <span className="font-medium">× {it.qty}</span>
-                </li>
+                <div key={it.id} className="rs-surface-muted flex items-center justify-between p-4">
+                  <div>
+                    <div className="text-sm font-semibold text-[var(--foreground)]">
+                      {it.name}
+                    </div>
+                    <div className="text-xs text-[var(--muted-foreground)]">
+                      Station supply item
+                    </div>
+                  </div>
+                  <div className="rs-pill">× {it.qty}</div>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
-        </div>
-      )}
+        </SectionCard>
+      ) : null}
 
-      {/* Tables list */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-4">
-        <div className="mb-3 text-sm font-semibold">
-          Tables ({station.stationName})
-        </div>
-
+      <SectionCard
+        title="Tables"
+        description={`Open a table from ${station.stationName} to continue into the existing order flow.`}
+      >
         {tables.length === 0 ? (
-          <div className="text-sm text-gray-400">No tables.</div>
+          <div className="text-sm text-[var(--muted-foreground)]">
+            No tables are assigned to this station yet.
+          </div>
         ) : (
-          <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {tables.map((t) => (
-              <li key={t.id}>
-                <button
-                  onClick={() => {
-                    try {
-                      sessionStorage.setItem(
-                        "lastTableNum",
-                        String(t.tableNum)
-                      );
-                      sessionStorage.setItem("lastTableId", t.id);
-                    } catch {}
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => {
+                  try {
+                    sessionStorage.setItem("lastTableNum", String(t.tableNum));
+                    sessionStorage.setItem("lastTableId", t.id);
+                  } catch {
+                    // ignore
+                  }
 
-                    onOpenOrderForTable(t.id);
-                  }}
-                  className="relative w-full rounded-2xl border border-gray-200 bg-white p-3 text-left hover:border-gray-300 hover:bg-gray-50"
-                >
-                  {/* table number badge (top-right) */}
-                  <div className="absolute right-2 top-2 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700">
-                    {t.tableNum}
+                  onOpenOrderForTable(t.id);
+                }}
+                className="group rounded-[28px] border border-[var(--border)] bg-[var(--card-muted)] p-4 text-left transition hover:-translate-y-px hover:border-[var(--border-strong)] hover:bg-[var(--card)] hover:shadow-[var(--shadow-strong)]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent)] text-[var(--accent-foreground)]">
+                    <TableIcon className="h-4.5 w-4.5" />
                   </div>
+                  <div className="rs-pill">Table {t.tableNum}</div>
+                </div>
 
-                  {/* main label: guest name */}
-                  <div className="pr-10 text-sm font-semibold text-gray-900">
-                    {t.owner?.trim() ? t.owner : "—"}
-                  </div>
+                <div className="mt-6 text-lg font-semibold text-[var(--foreground)]">
+                  {t.owner?.trim() ? t.owner : "Walk-in / no guest name"}
+                </div>
+                <div className="mt-2 text-sm text-[var(--muted-foreground)]">
+                  Open the live order and keep the existing workflow exactly as-is.
+                </div>
 
-                  <div className="mt-1 text-xs text-gray-600">
-                    Total:{" "}
-                    <span className="font-medium">
-                      ₪{formatMoney(t.total ?? 0)}
-                    </span>
+                <div className="mt-5 flex items-center justify-between">
+                  <div className="text-sm font-medium text-[var(--foreground)]">
+                    ₪{formatMoney(t.total ?? 0)}
                   </div>
-                </button>
-              </li>
+                  <div className="flex items-center gap-2 text-xs font-medium text-[var(--muted-foreground)]">
+                    <OrdersIcon className="h-4 w-4" />
+                    Open order
+                  </div>
+                </div>
+              </button>
             ))}
-          </ul>
+          </div>
         )}
-      </div>
-    </div>
+      </SectionCard>
+    </PageContainer>
   );
 }

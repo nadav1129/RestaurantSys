@@ -93,36 +93,36 @@ export default function useMenuDialogs(): MenuDialogApi {
       function DialogsComponent() {
         if (!dialog) return null;
         return (
-          <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-6">
-            <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
-              <div className="border-b border-gray-200 px-5 py-4">
-                <div className="text-sm font-semibold text-gray-900">
+          <div className="rs-overlay fixed inset-0 z-50 flex items-start justify-center p-6">
+            <div className="rs-modal w-full max-w-md">
+              <div className="border-b border-[var(--border)] px-5 py-4">
+                <div className="text-sm font-semibold text-[var(--foreground)]">
                   {dialog.title}
                 </div>
               </div>
               <div className="px-5 py-4">
-                <div className="text-sm text-gray-600">{dialog.message}</div>
+                <div className="text-sm text-[var(--muted-foreground)]">{dialog.message}</div>
                 {dialog.type === "prompt" && (
                   <input
-                    className="mt-4 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    className="rs-input mt-4"
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     autoFocus
                   />
                 )}
               </div>
-              <div className="flex justify-end gap-2 border-t border-gray-200 px-5 py-4">
+              <div className="flex justify-end gap-2 border-t border-[var(--border)] px-5 py-4">
                 {dialog.type !== "alert" && (
                   <button
                     onClick={handleCancel}
-                    className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                    className="rounded-2xl border border-[var(--border)] bg-[var(--card-muted)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--muted)]"
                   >
                     Cancel
                   </button>
                 )}
                 <button
                   onClick={handleOk}
-                  className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
+                  className="rounded-2xl border border-[var(--primary)] bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] transition hover:brightness-110"
                 >
                   {dialog.type === "alert" ? "OK" : "Confirm"}
                 </button>

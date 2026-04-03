@@ -1,6 +1,5 @@
-// src/pages/OrderPage/ItemDetails.tsx
-import React from "react";
 import type { ProductItem } from "./OrderPage";
+import Button from "../../components/Button";
 
 type ItemDetailsProps = {
   product: ProductItem;
@@ -15,42 +14,67 @@ type ItemDetailsProps = {
 };
 
 export default function ItemDetails({
-  product, qty, setQty, notes, setNotes, adds, setAdds, onCancel, onAdd,
+  product,
+  qty,
+  setQty,
+  notes,
+  setNotes,
+  adds,
+  setAdds,
+  onCancel,
+  onAdd,
 }: ItemDetailsProps) {
   const toggleAdd = (name: string) =>
     setAdds(adds.includes(name) ? adds.filter((x) => x !== name) : [...adds, name]);
 
   return (
-    <div className="rounded-2xl ring-1 ring-gray-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 text-lg font-semibold text-gray-800">{product.name}</div>
+    <div className="rs-surface h-full p-5 lg:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="text-2xl font-semibold tracking-tight text-[var(--foreground)]">
+            {product.name}
+          </div>
+          {product.price != null ? (
+            <div className="mt-2 text-sm text-[var(--muted-foreground)]">
+              Unit price {product.price}
+            </div>
+          ) : null}
+        </div>
+      </div>
 
-      <div className="mb-4 flex items-center gap-3">
-        <span className="text-sm text-gray-600">Qty</span>
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <span className="text-sm text-[var(--muted-foreground)]">Qty</span>
         <button
-          className="rounded-lg px-2 py-1 ring-1 ring-gray-200 hover:bg-gray-50"
+          className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--card-muted)] transition hover:bg-[var(--muted)]"
           onClick={() => setQty(Math.max(1, qty - 1))}
         >
           −
         </button>
-        <span className="w-8 text-center text-gray-800">{qty}</span>
+        <span className="w-10 text-center text-lg font-semibold text-[var(--foreground)]">
+          {qty}
+        </span>
         <button
-          className="rounded-lg px-2 py-1 ring-1 ring-gray-200 hover:bg-gray-50"
+          className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--card-muted)] transition hover:bg-[var(--muted)]"
           onClick={() => setQty(qty + 1)}
         >
           +
         </button>
       </div>
 
-      <div className="mb-4">
-        <div className="mb-2 text-sm text-gray-600">Additions</div>
+      <div className="mt-6">
+        <div className="mb-3 text-sm font-semibold text-[var(--foreground)]">
+          Additions
+        </div>
         <div className="flex flex-wrap gap-2">
           {["Extra Ice", "Lemon", "Tonic", "Mint"].map((a) => {
             const active = adds.includes(a);
             return (
               <button
                 key={a}
-                className={`rounded-xl px-3 py-1 text-sm ring-1 transition ${
-                  active ? "ring-gray-800 bg-gray-900 text-white" : "ring-gray-200 hover:bg-gray-50"
+                className={`rounded-full px-4 py-2 text-sm transition ${
+                  active
+                    ? "bg-[var(--accent)] text-[var(--accent-foreground)]"
+                    : "border border-[var(--border)] bg-[var(--card-muted)] text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
                 }`}
                 onClick={() => toggleAdd(a)}
                 aria-pressed={active}
@@ -62,24 +86,24 @@ export default function ItemDetails({
         </div>
       </div>
 
-      <div className="mb-4">
-        <div className="mb-1 text-sm text-gray-600">Notes</div>
+      <div className="mt-6">
+        <div className="mb-2 text-sm font-semibold text-[var(--foreground)]">
+          Notes
+        </div>
         <textarea
-          className="w-full rounded-xl p-2 ring-1 ring-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300"
+          className="rs-textarea min-h-[120px]"
           rows={3}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="No sugar, half ice…"
+          placeholder="No sugar, half ice..."
         />
       </div>
 
-      <div className="flex gap-2">
-        <button className="rounded-xl px-3 py-2 ring-1 ring-gray-200 hover:bg-gray-50" onClick={onCancel}>
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Button variant="secondary" onClick={onCancel}>
           Cancel
-        </button>
-        <button className="rounded-xl px-3 py-2 ring-1 ring-gray-800 bg-gray-900 text-white hover:shadow-sm" onClick={onAdd}>
-          Add to order
-        </button>
+        </Button>
+        <Button onClick={onAdd}>Add to order</Button>
       </div>
     </div>
   );

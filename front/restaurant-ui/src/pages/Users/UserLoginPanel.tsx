@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch } from "../../api/api";
 import Button from "../../components/Button";
-
+import { QuickOrderIcon, SearchIcon, XIcon } from "../../components/icons";
 
 type User = {
   userId: string;
@@ -32,7 +32,6 @@ export default function UserLoginPanel({
   const [pinLoading, setPinLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-
   useEffect(() => {
     async function loadUsers() {
       setLoadingUsers(true);
@@ -46,6 +45,7 @@ export default function UserLoginPanel({
         setLoadingUsers(false);
       }
     }
+
     loadUsers();
   }, []);
 
@@ -60,13 +60,12 @@ export default function UserLoginPanel({
 
     try {
       const resp = (await apiFetch("/api/auth/login", {
-  method: "POST",
-  body: {
-    userId: selectedUser.userId,
-    passcode: pin.trim(),
-  } as any,
-})) as LoginResponse;
-
+        method: "POST",
+        body: {
+          userId: selectedUser.userId,
+          passcode: pin.trim(),
+        } as any,
+      })) as LoginResponse;
 
       onLoginSuccess(resp);
       setPin("");
@@ -79,121 +78,152 @@ export default function UserLoginPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-        {/* Header */}
-        <div className="mb-4 flex items-center justify-between">
+    <div className="rs-overlay fixed inset-0 z-40 flex items-center justify-center px-4">
+      <div className="rs-modal w-full max-w-3xl p-6 lg:p-8">
+        <div className="mb-6 flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Login</h2>
-            <p className="text-xs text-gray-500">
-              Select your user and enter your personal code.
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
+              Staff access
+            </div>
+            <h2 className="mt-2 font-display text-3xl font-semibold tracking-tight text-[var(--foreground)]">
+              Select your user and enter your PIN
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
+              Existing auth logic stays the same. This is a calmer, quicker way to scan and sign in.
             </p>
           </div>
-          {onClose && (
+          {onClose ? (
             <button
+              type="button"
               onClick={onClose}
-              className="rounded-full px-2 py-1 text-xs text-gray-500 hover:bg-gray-100"
+              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--card-muted)] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
             >
-              Close
+              <XIcon className="h-4.5 w-4.5" />
             </button>
-          )}
+          ) : null}
         </div>
 
-        {error && (
-          <div className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">
+        {error ? (
+          <div className="mb-4 rounded-2xl border border-[var(--destructive)] bg-[var(--warning-surface)] px-4 py-3 text-sm text-[var(--destructive)]">
             {error}
           </div>
-        )}
+        ) : null}
 
-        {/* User list */}
-        <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-200">
-          {loadingUsers ? (
-            <div className="p-4 text-sm text-gray-500">Loading users…</div>
-          ) : users.length === 0 ? (
-            <div className="p-4 text-sm text-gray-500">
-              No users yet. Use &quot;Create new user&quot; below.
+        <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="space-y-4">
+            <div className="relative">
+              <SearchIcon className="pointer-events-none absolute left-4 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-[var(--muted-foreground)]" />
+              <div className="rs-input pl-11 text-sm text-[var(--muted-foreground)]">
+                Choose a staff member from the list below
+              </div>
             </div>
-          ) : (
-            <ul className="divide-y divide-gray-100">
-              {users.map((u) => (
-                <li
-                  key={u.userId}
-                  className={`flex cursor-pointer items-center justify-between px-4 py-2 text-sm ${
-                    selectedUser?.userId === u.userId
-                      ? "bg-blue-50"
-                      : "hover:bg-gray-50"
-                  }`}
-                  onClick={() => {
-                    setSelectedUser(u);
-                    setPin("");
-                    setError(null);
-                  }}
-                >
-                  <div>
-                    <div className="font-medium text-gray-900">{u.name}</div>
-                    <div className="text-[10px] uppercase tracking-wide text-gray-400">
-                      {u.role}
-                    </div>
-                  </div>
-                  {selectedUser?.userId === u.userId && (
-                    <span className="text-xs font-semibold text-blue-600">
-                      Selected
-                    </span>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
 
-        {/* PIN popup area */}
-        {selectedUser && (
-          <form onSubmit={handleLogin} className="mt-4 space-y-3">
-            <div className="text-xs text-gray-600">
-              Enter code for{" "}
-              <span className="font-semibold">{selectedUser.name}</span>
+            <div className="max-h-[420px] overflow-y-auto rounded-[28px] border border-[var(--border)] bg-[var(--card-muted)] p-3">
+              {loadingUsers ? (
+                <div className="p-4 text-sm text-[var(--muted-foreground)]">
+                  Loading users...
+                </div>
+              ) : users.length === 0 ? (
+                <div className="p-4 text-sm text-[var(--muted-foreground)]">
+                  No users yet. Use "Create new user" below.
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {users.map((u) => {
+                    const active = selectedUser?.userId === u.userId;
+                    return (
+                      <li key={u.userId}>
+                        <button
+                          type="button"
+                          className={[
+                            "flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-left transition",
+                            active
+                              ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
+                              : "border-transparent bg-[var(--card)] text-[var(--foreground)] hover:border-[var(--border)] hover:bg-[var(--card-muted)]",
+                          ].join(" ")}
+                          onClick={() => {
+                            setSelectedUser(u);
+                            setPin("");
+                            setError(null);
+                          }}
+                        >
+                          <div>
+                            <div className="text-sm font-semibold">{u.name}</div>
+                            <div className="mt-1 text-xs uppercase tracking-[0.2em] opacity-80">
+                              {u.role}
+                            </div>
+                          </div>
+                          {active ? (
+                            <div className="rounded-full bg-white/55 px-3 py-1 text-xs font-semibold">
+                              Selected
+                            </div>
+                          ) : null}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
-            <input
-              type="password"
-              inputMode="numeric"
-              value={pin}
-              maxLength={12}
-              onChange={(e) =>
-                setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 12))
-              }
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-center text-xl tracking-[0.4em]"
-              placeholder="••••"
-            />
-            <div className="flex justify-between items-center">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  setSelectedUser(null);
-                  setPin("");
-                }}
-              >
-                Change user
-              </Button>
-              <Button type="submit" disabled={!isPinValid || pinLoading}>
-                {pinLoading ? "Logging in…" : "Login"}
-              </Button>
-            </div>
-          </form>
-        )}
-
-        {/* Bottom: create new user */}
-        <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-3">
-          <div className="text-xs text-gray-500">
-            New staff? Claim your staff code first.
           </div>
-          <Button
-  type="button"
-  onClick={onCreateNewUser}
->
-  Create new user
-</Button>
 
+          <div className="rounded-[28px] border border-[var(--border)] bg-[var(--card-muted)] p-5">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent)] text-[var(--accent-foreground)]">
+              <QuickOrderIcon className="h-5 w-5" />
+            </div>
+            <div className="mt-5 text-xl font-semibold text-[var(--foreground)]">
+              {selectedUser ? selectedUser.name : "Select a user"}
+            </div>
+            <div className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
+              {selectedUser
+                ? "Enter the personal code already assigned to this user."
+                : "Once you choose a user, the PIN field will be ready here."}
+            </div>
+
+            {selectedUser ? (
+              <form onSubmit={handleLogin} className="mt-6 space-y-4">
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  value={pin}
+                  maxLength={12}
+                  onChange={(e) =>
+                    setPin(
+                      e.target.value.replace(/[^0-9]/g, "").slice(0, 12)
+                    )
+                  }
+                  className="rs-input text-center font-display text-2xl tracking-[0.4em]"
+                  placeholder="••••"
+                />
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setSelectedUser(null);
+                      setPin("");
+                    }}
+                  >
+                    Change user
+                  </Button>
+                  <Button type="submit" disabled={!isPinValid || pinLoading}>
+                    {pinLoading ? "Logging in..." : "Login"}
+                  </Button>
+                </div>
+              </form>
+            ) : null}
+
+            <div className="mt-8 border-t border-[var(--border)] pt-4">
+              <div className="text-sm text-[var(--muted-foreground)]">
+                New staff? Claim your staff code first.
+              </div>
+              <div className="mt-3">
+                <Button type="button" onClick={onCreateNewUser}>
+                  Create new user
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

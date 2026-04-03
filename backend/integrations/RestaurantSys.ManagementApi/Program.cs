@@ -90,17 +90,20 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 }
 
-// ---- ONE FILE MIGRATION (run every boot) ----
-var schemaPath = Path.Combine(app.Environment.ContentRootPath, "sql", "schema.sql");
-if (!File.Exists(schemaPath))
+// ---- SQL bootstrap (run every boot) ----
+var sqlScripts = new[] { "schema.sql", "seed.sql" };
+foreach (var scriptName in sqlScripts)
 {
-    app.Logger.LogWarning("schema.sql not found at {Path}. Skipping DB init.", schemaPath);
-}
-else
-{
+    var scriptPath = Path.Combine(app.Environment.ContentRootPath, "sql", scriptName);
+    if (!File.Exists(scriptPath))
+    {
+        app.Logger.LogWarning("{Script} not found at {Path}. Skipping.", scriptName, scriptPath);
+        continue;
+    }
+
     try
     {
-        var sql = await File.ReadAllTextAsync(schemaPath);
+        var sql = await File.ReadAllTextAsync(scriptPath);
 
         await using var conn = await dataSource.OpenConnectionAsync();
         await using var tx = await conn.BeginTransactionAsync(IsolationLevel.Serializable);
@@ -114,11 +117,11 @@ else
         }
 
         await tx.CommitAsync();
-        app.Logger.LogInformation("Applied schema.sql successfully.");
+        app.Logger.LogInformation("Applied {Script} successfully.", scriptName);
     }
     catch (Exception ex)
     {
-        app.Logger.LogError(ex, "schema.sql execution failed.");
+        app.Logger.LogError(ex, "{Script} execution failed.", scriptName);
         throw;
     }
 }

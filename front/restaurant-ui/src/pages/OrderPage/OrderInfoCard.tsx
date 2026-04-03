@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import Button from "../../components/Button";
+import { ClockIcon, OrdersIcon, ReceiptIcon, TableIcon } from "../../components/icons";
 
 function formatTime(d: Date | null): string {
   if (!d) return "--:--";
@@ -9,7 +10,6 @@ function formatTime(d: Date | null): string {
   });
 }
 
-/* Format 19.00 -> 19, 19.50 -> 19.5 */
 function formatMoney(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return "0";
   return n.toFixed(2).replace(/\.0+$/, "").replace(/(\.[0-9]*?)0+$/, "$1");
@@ -18,35 +18,26 @@ function formatMoney(n: number | null | undefined): string {
 type OrderInfoCardProps = {
   table: string;
   setTable: (value: string) => void;
-
   tableId: string | null;
   setTableId: (value: string | null) => void;
-
   guestName: string;
   setGuestName: (value: string) => void;
-
   diners: string;
   setDiners: (value: string) => void;
-
   phone: string;
   setPhone: (value: string) => void;
-
   note: string;
   setNote: (value: string) => void;
-
   startTime: Date | null;
   endTime: Date | null;
-
   minimum: number;
   total: number;
   totalWith10: number;
   only10: number;
-
-  topButtonLabel: string;          /* "Confirm" when pending exists, else "Pay Now" */
+  topButtonLabel: string;
   topButtonDisabled?: boolean;
   onTopButtonClick: () => void;
-
-  hasConfirmedItems: boolean;      /* for Print */
+  hasConfirmedItems: boolean;
 };
 
 export default function OrderInfoCard({
@@ -94,125 +85,138 @@ export default function OrderInfoCard({
 
   return (
     <>
-      <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-4 md:flex-row md:items-stretch md:justify-between">
-        {/* Left: info section (top row + guest/phone + notes) */}
-        <div className="flex flex-1 flex-col gap-3">
-          {/* Top line: Table, Diners, Start, End */}
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            {/* Table */}
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500">Table</span>
-              <input
-                className="w-24 rounded-xl border border-gray-300 px-3 py-1 text-sm"
-                value={table}
-                onChange={(e) => setTable(e.target.value)}
-                placeholder="none"
+      <div className="rs-surface p-5 lg:p-6">
+        <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_360px]">
+          <div className="space-y-5">
+            <div className="flex flex-wrap gap-3">
+              <div className="rs-pill">
+                <TableIcon className="h-4 w-4" />
+                Table {table || "—"}
+              </div>
+              <div className="rs-pill">
+                <ClockIcon className="h-4 w-4" />
+                Start {formatTime(startTime)}
+              </div>
+              <div className="rs-pill">End {formatTime(endTime)}</div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-[minmax(150px,180px)_minmax(0,1fr)_minmax(120px,140px)]">
+              <label className="space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+                  Table
+                </span>
+                <input
+                  className="rs-input"
+                  value={table}
+                  onChange={(e) => setTable(e.target.value)}
+                  placeholder="none"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+                  Table ID
+                </span>
+                <input
+                  className="rs-input"
+                  value={tableId ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value.trim();
+                    setTableId(v.length ? v : null);
+                  }}
+                  placeholder="tableId (GUID)"
+                  title="Real tableId (GUID). Used for persisting the open order."
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+                  Diners
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  className="rs-input"
+                  value={diners}
+                  onChange={(e) => setDiners(e.target.value)}
+                  placeholder="2"
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(300px,0.95fr)]">
+              <div className="space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+                  Guest
+                </span>
+                <button
+                  type="button"
+                  onClick={openGuestEditor}
+                  className="flex w-full items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--card-muted)] px-4 py-3 text-left transition hover:bg-[var(--muted)]"
+                >
+                  <div>
+                    <div className="font-medium text-[var(--foreground)]">
+                      {displayName}
+                    </div>
+                    <div className="text-sm text-[var(--muted-foreground)]">
+                      {displayPhone}
+                    </div>
+                  </div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+                    Edit
+                  </div>
+                </button>
+              </div>
+
+              <label className="space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
+                  Notes
+                </span>
+                <textarea
+                  className="rs-textarea min-h-[120px]"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Birthday, allergy, special request..."
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="space-y-4 rounded-[28px] border border-[var(--border)] bg-[var(--card-muted)] p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent)] text-[var(--accent-foreground)]">
+                <OrdersIcon className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-[var(--foreground)]">
+                  Order Summary
+                </div>
+                <div className="text-sm text-[var(--muted-foreground)]">
+                  Totals update from the existing cart logic.
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              <SummaryLine label="Minimum" value={`₪${formatMoney(minimum)}`} />
+              <SummaryLine label="Total" value={`₪${formatMoney(total)}`} />
+              <SummaryLine
+                label="Total + 10%"
+                value={`₪${formatMoney(totalWith10)}`}
+                strong
               />
-              <input
-                className="w-[22rem] max-w-[50vw] rounded-xl border border-gray-300 px-3 py-1 text-xs"
-                value={tableId ?? ""}
-                onChange={(e) => {
-                  const v = e.target.value.trim();
-                  setTableId(v.length ? v : null);
-                }}
-                placeholder="tableId (GUID)"
-                title="Real tableId (GUID). Used for persisting the open order."
-              />
+              <SummaryLine label="Only 10%" value={`₪${formatMoney(only10)}`} />
             </div>
 
-            {/* Diners */}
-            <div className="flex items-center gap-2">
-              <span className="text-gray-500">Diners</span>
-              <input
-                type="number"
-                min={1}
-                className="w-20 rounded-xl border border-gray-300 px-2 py-1 text-sm"
-                value={diners}
-                onChange={(e) => setDiners(e.target.value)}
-                placeholder="2"
-              />
-            </div>
-
-            {/* Start time */}
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-gray-500">Start</span>
-              <span className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-1">
-                {formatTime(startTime)}
-              </span>
-            </div>
-
-            {/* End time */}
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-gray-500">End</span>
-              <span className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-1">
-                {formatTime(endTime)}
-              </span>
-            </div>
-          </div>
-
-          {/* Name + Phone combined */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-600">Guest</label>
-            <button
-              type="button"
-              onClick={openGuestEditor}
-              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-left text-sm hover:border-gray-400 hover:bg-gray-50"
-            >
-              {displayName} — {displayPhone}
-            </button>
-          </div>
-
-          {/* Notes - big area */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-gray-600">Notes</label>
-            <textarea
-              className="min-h-[90px] w-full rounded-xl border border-gray-300 p-2 text-sm"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Birthday, allergy, special request..."
-            />
-          </div>
-        </div>
-
-        {/* Right: totals + Print + Confirm/Pay anchored to bottom */}
-        <div className="mt-2 flex w-full max-w-xs flex-col justify-between text-sm md:mt-0 md:self-stretch">
-          {/* Totals text */}
-          <div className="space-y-1 text-right">
-            <div>
-              <span className="text-gray-500">Minimum: </span>
-              <span className="font-medium">₪{formatMoney(minimum)}</span>
-            </div>
-            <div>
-              <span className="text-gray-500">Total: </span>
-              <span className="font-medium">₪{formatMoney(total)}</span>
-            </div>
-            <div>
-              <span className="text-gray-500">Total + 10%: </span>
-              <span className="font-semibold">₪{formatMoney(totalWith10)}</span>
-            </div>
-            <div>
-              <span className="text-gray-500">Only 10%: </span>
-              <span className="font-medium">₪{formatMoney(only10)}</span>
-            </div>
-          </div>
-
-          {/* Buttons row at the bottom, same size */}
-          <div className="mt-4 flex w-full justify-end">
-            <div className="flex w-full gap-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <Button
                 variant="secondary"
                 onClick={() => window.print()}
                 disabled={!hasConfirmedItems}
-                className="flex-1 justify-center"
               >
-                Print recite
+                <ReceiptIcon className="h-4 w-4" />
+                Print receipt
               </Button>
 
-              <Button
-                onClick={onTopButtonClick}
-                disabled={topButtonDisabled}
-                className="flex-1 justify-center"
-              >
+              <Button onClick={onTopButtonClick} disabled={topButtonDisabled}>
                 {topButtonLabel}
               </Button>
             </div>
@@ -220,56 +224,71 @@ export default function OrderInfoCard({
         </div>
       </div>
 
-      {/* Popup for editing Name + Phone */}
       {showGuestEditor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-lg">
-            <div className="mb-3 text-sm font-semibold text-gray-800">
+        <div className="rs-overlay fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="rs-modal w-full max-w-sm p-5">
+            <div className="mb-4 text-lg font-semibold text-[var(--foreground)]">
               Guest details
             </div>
-            <div className="mb-3 flex flex-col gap-2">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-600">
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                   Name
                 </label>
                 <input
-                  className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                  className="rs-input"
                   value={tempName}
                   onChange={(e) => setTempName(e.target.value)}
                   placeholder="Guest name"
                 />
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-600">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted-foreground)]">
                   Phone
                 </label>
                 <input
-                  className="rounded-xl border border-gray-300 px-3 py-2 text-sm"
+                  className="rs-input"
                   value={tempPhone}
                   onChange={(e) => setTempPhone(e.target.value)}
                   placeholder="050-0000000"
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowGuestEditor(false)}
-                className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-100"
-              >
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setShowGuestEditor(false)}>
                 Cancel
-              </button>
-              <button
-                type="button"
-                onClick={saveGuestEditor}
-                className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
-              >
-                Save
-              </button>
+              </Button>
+              <Button onClick={saveGuestEditor}>Save</Button>
             </div>
           </div>
         </div>
       )}
     </>
+  );
+}
+
+function SummaryLine({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+      <span className="text-sm text-[var(--muted-foreground)]">{label}</span>
+      <span
+        className={[
+          "text-sm",
+          strong
+            ? "font-semibold text-[var(--foreground)]"
+            : "font-medium text-[var(--foreground)]",
+        ].join(" ")}
+      >
+        {value}
+      </span>
+    </div>
   );
 }

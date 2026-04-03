@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { apiFetch } from "../api/api";
+import Button from "./Button";
+import { PlusIcon, XIcon } from "./icons";
 
 type ProductIngredientLineDraft = {
   ingredientId: string;
@@ -18,23 +20,20 @@ export default function AddProductModal({
   onSave: (data: {
     name: string;
     isBottleOnly: boolean;
-    productType: string;        // <— NEW: send product type
+    productType: string;
     lines: ProductIngredientLineDraft[];
   }) => void;
 }) {
   const [name, setName] = useState("");
   const [isBottleOnly, setIsBottleOnly] = useState(false);
-  const [isFood, setIsFood] = useState(false);   // <— NEW: food flag
-
+  const [isFood, setIsFood] = useState(false);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [ingLoading, setIngLoading] = useState<boolean>(false);
   const [ingError, setIngError] = useState<string | null>(null);
-
   const [lines, setLines] = useState<ProductIngredientLineDraft[]>([
     { ingredientId: "", isLeading: false, isChangeable: false, amount: "" },
   ]);
 
-  /* Load ingredients (normalized) */
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -43,10 +42,12 @@ export default function AddProductModal({
         setIngError(null);
         const data = await apiFetch("/api/ingredients");
 
-        const list: Ingredient[] = (Array.isArray(data) ? data : []).map((x: any) => ({
-          ingredientId: x.ingredientId ?? x.ingredient_id ?? x.id,
-          name: x.name ?? x.Name,
-        }));
+        const list: Ingredient[] = (Array.isArray(data) ? data : []).map(
+          (x: any) => ({
+            ingredientId: x.ingredientId ?? x.ingredient_id ?? x.id,
+            name: x.name ?? x.Name,
+          })
+        );
 
         if (!cancelled) {
           const cleaned = list.filter((i) => i.ingredientId && i.name);
@@ -61,6 +62,7 @@ export default function AddProductModal({
         if (!cancelled) setIngLoading(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -89,7 +91,6 @@ export default function AddProductModal({
     e.preventDefault();
     e.stopPropagation();
 
-    // Submit only valid lines (must have ingredientId; amount required unless bottle-only)
     const cleaned = lines
       .map((l) => ({
         ...l,
@@ -98,17 +99,16 @@ export default function AddProductModal({
       }))
       .filter((l) => l.ingredientId && (isBottleOnly ? true : l.amount));
 
-    const productType = isFood ? "food" : "default";  // <— decide type
+    const productType = isFood ? "food" : "default";
 
     onSave({
       name: name.trim(),
       isBottleOnly,
-      productType,                                    // <— pass it
+      productType,
       lines: cleaned,
     });
   }
 
-  // Handlers to keep "bottle only" vs "food" mutually exclusive
   function handleBottleOnlyChange(checked: boolean) {
     setIsBottleOnly(checked);
     if (checked) {
@@ -125,97 +125,104 @@ export default function AddProductModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-6"
+      className="rs-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-6"
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+      <div className="rs-modal w-full max-w-3xl">
+        <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-5">
           <div>
-            <div className="text-sm font-medium text-gray-500">New Product</div>
-            <div className="text-lg font-semibold text-gray-800">Create Menu Item</div>
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
+              New Product
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
+              Create menu item
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-xl border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--card-muted)] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
           >
-            Close
+            <XIcon className="h-4.5 w-4.5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="max-h-[70vh] overflow-y-auto p-5">
-          <div className="mb-5 grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="mb-1 block text-xs font-semibold text-gray-700">
-                Product Name
-              </label>
+        <form onSubmit={handleSubmit} className="max-h-[80vh] overflow-y-auto p-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-semibold text-[var(--foreground)]">
+                Product name
+              </span>
               <input
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                className="rs-input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
+            </label>
+
+            <label className="rs-surface-muted flex items-center gap-3 p-4">
+              <input
+                id="bottleOnly"
+                type="checkbox"
+                className="h-4 w-4"
+                checked={isBottleOnly}
+                onChange={(e) => handleBottleOnlyChange(e.target.checked)}
+              />
+              <span className="text-sm font-medium text-[var(--foreground)]">
+                Sold as full bottle only
+              </span>
+            </label>
+
+            <label className="rs-surface-muted flex items-center gap-3 p-4">
+              <input
+                id="foodType"
+                type="checkbox"
+                className="h-4 w-4"
+                checked={isFood}
+                onChange={(e) => handleFoodChange(e.target.checked)}
+              />
+              <span className="text-sm font-medium text-[var(--foreground)]">
+                Food
+              </span>
+            </label>
+          </div>
+
+          <div className="mt-6">
+            <div className="text-lg font-semibold text-[var(--foreground)]">
+              Composition / Ingredients
             </div>
-
-            <div className="col-span-2 flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <input
-                  id="bottleOnly"
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
-                  checked={isBottleOnly}
-                  onChange={(e) => handleBottleOnlyChange(e.target.checked)}
-                />
-                <label htmlFor="bottleOnly" className="text-xs font-semibold text-gray-700">
-                  Sold as full bottle only
-                </label>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <input
-                  id="foodType"
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
-                  checked={isFood}
-                  onChange={(e) => handleFoodChange(e.target.checked)}
-                />
-                <label htmlFor="foodType" className="text-xs font-semibold text-gray-700">
-                  Food
-                </label>
-              </div>
+            <div className="mt-1 text-sm text-[var(--muted-foreground)]">
+              Build a clean ingredient breakdown for the product without changing the existing creation flow.
             </div>
           </div>
 
-          <div className="mb-3 text-sm font-semibold text-gray-800">
-            Composition / Ingredients
-          </div>
-
-          {ingLoading && (
-            <div className="mb-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
-              Loading ingredients…
+          {ingLoading ? (
+            <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--card-muted)] p-4 text-sm text-[var(--muted-foreground)]">
+              Loading ingredients...
             </div>
-          )}
-          {ingError && (
-            <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+          ) : null}
+
+          {ingError ? (
+            <div className="mt-4 rounded-2xl border border-[var(--destructive)] bg-[var(--warning-surface)] p-4 text-sm text-[var(--destructive)]">
               {ingError}
             </div>
-          )}
+          ) : null}
 
-          <div className="space-y-3">
+          <div className="mt-4 space-y-4">
             {lines.map((line, idx) => (
-              <div
-                key={idx}
-                className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm"
-              >
-                <div className="mb-2 grid grid-cols-2 gap-3">
-                  <div className="col-span-2">
-                    <label className="mb-1 block text-[10px] font-semibold text-gray-700">
+              <div key={idx} className="rs-surface-muted p-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="space-y-2 md:col-span-2">
+                    <span className="text-sm font-semibold text-[var(--foreground)]">
                       Ingredient
-                    </label>
+                    </span>
                     <select
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      className="rs-select"
                       value={line.ingredientId}
-                      onChange={(e) => updateLine(idx, { ingredientId: e.target.value })}
+                      onChange={(e) =>
+                        updateLine(idx, { ingredientId: e.target.value })
+                      }
                       required
                     >
                       <option value="">Select...</option>
@@ -225,83 +232,80 @@ export default function AddProductModal({
                         </option>
                       ))}
                     </select>
-                  </div>
+                  </label>
 
-                  <div>
-                    <label className="mb-1 block text-[10px] font-semibold text-gray-700">
+                  <label className="space-y-2">
+                    <span className="text-sm font-semibold text-[var(--foreground)]">
                       Amount
-                    </label>
+                    </span>
                     <input
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      className="rs-input"
                       value={line.amount}
                       onChange={(e) => updateLine(idx, { amount: e.target.value })}
                       placeholder="50ml / 200g / etc"
                       required={!isBottleOnly}
                     />
-                  </div>
+                  </label>
 
-                  <div className="flex flex-col justify-end gap-2">
-                    <label className="flex items-center gap-2 text-[10px] font-semibold text-gray-700">
+                  <div className="grid gap-3">
+                    <label className="rs-surface flex items-center gap-3 p-4">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                        className="h-4 w-4"
                         checked={line.isLeading}
-                        onChange={(e) => updateLine(idx, { isLeading: e.target.checked })}
+                        onChange={(e) =>
+                          updateLine(idx, { isLeading: e.target.checked })
+                        }
                       />
-                      Leading
+                      <span className="text-sm font-medium text-[var(--foreground)]">
+                        Leading ingredient
+                      </span>
                     </label>
 
-                    <label className="flex items-center gap-2 text-[10px] font-semibold text-gray-700">
+                    <label className="rs-surface flex items-center gap-3 p-4">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900"
+                        className="h-4 w-4"
                         checked={line.isChangeable}
-                        onChange={(e) => updateLine(idx, { isChangeable: e.target.checked })}
+                        onChange={(e) =>
+                          updateLine(idx, { isChangeable: e.target.checked })
+                        }
                       />
-                      Changeable
+                      <span className="text-sm font-medium text-[var(--foreground)]">
+                        Changeable ingredient
+                      </span>
                     </label>
                   </div>
                 </div>
 
-                <div className="flex justify-end">
-                  <button
+                <div className="mt-4 flex justify-end">
+                  <Button
                     type="button"
-                    className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-[10px] font-medium text-gray-700 hover:bg-gray-100"
+                    variant="secondary"
                     onClick={() => removeLine(idx)}
                   >
                     Remove line
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="mt-3">
-            <button
-              type="button"
-              onClick={addLine}
-              className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100"
-            >
-              + Add ingredient line
-            </button>
+          <div className="mt-4">
+            <Button type="button" variant="secondary" onClick={addLine}>
+              <PlusIcon className="h-4 w-4" />
+              Add ingredient line
+            </Button>
           </div>
 
-          <div className="mt-6 flex justify-end gap-2 border-t border-gray-200 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
+          <div className="mt-8 flex justify-end gap-2 border-t border-[var(--border)] pt-5">
+            <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
-            </button>
+            </Button>
 
-            <button
-              type="submit"
-              className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black"
-              disabled={!name.trim()}
-            >
+            <Button type="submit" disabled={!name.trim()}>
               Save Product
-            </button>
+            </Button>
           </div>
         </form>
       </div>

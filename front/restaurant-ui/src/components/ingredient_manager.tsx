@@ -1,35 +1,20 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
-
+import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../api/api";
-/*
-  IngredientManager.tsx
-  A light-weight full-screen panel you can open from MenuPage to manage ingredients.
-  - Shows list of ingredients
-  - Add by name
-  - Remove selected
-  - Back button to close
+import Button from "./Button";
+import { PlusIcon, XIcon } from "./icons";
 
-  Expected backend endpoints:
-    GET    /api/ingredients                -> IngredientDto[]
-    POST   /api/ingredients                -> { ingredientId, name }
-    DELETE /api/ingredients/{ingredientId} -> 204
-
-  Integration (MenuPage.tsx) example:
-    const [openIng, setOpenIng] = useState(false);
-    <Button onClick={() => setOpenIng(true)}>Ingredients</Button>
-    <IngredientManager open={openIng} onClose={() => setOpenIng(false)} />
-*/
-
-/* ---------- Types ---------- */
 export type IngredientDto = {
   ingredientId: string;
   name: string;
 };
 
-/* (Using shared apiFetch from src/api/api.ts) */
-
-/* ---------- Component ---------- */
-export default function IngredientManager({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function IngredientManager({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
   const [items, setItems] = useState<IngredientDto[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +23,6 @@ export default function IngredientManager({ open, onClose }: { open: boolean; on
   const [busyCreate, setBusyCreate] = useState(false);
   const [busyRemove, setBusyRemove] = useState<string | null>(null);
 
-  /* Fetch on open */
   useEffect(() => {
     if (!open) return;
     (async () => {
@@ -68,13 +52,15 @@ export default function IngredientManager({ open, onClose }: { open: boolean; on
     setError(null);
     try {
       const resp = await apiFetch("/api/ingredients", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: { name },
-});
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: { name },
+      });
 
       setItems((prev) =>
-        [...prev, resp as IngredientDto].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+        [...prev, resp as IngredientDto].sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+        )
       );
       setNewName("");
     } catch (e: any) {
@@ -100,78 +86,91 @@ export default function IngredientManager({ open, onClose }: { open: boolean; on
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-6" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-      <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+    <div className="rs-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-6">
+      <div className="rs-modal w-full max-w-3xl">
+        <div className="flex items-center justify-between border-b border-[var(--border)] px-6 py-5">
           <div>
-            <h2 className="text-xl font-semibold">Ingredients</h2>
-            <p className="text-xs text-gray-500">Add / remove base ingredients used by products</p>
+            <h2 className="text-2xl font-semibold text-[var(--foreground)]">
+              Ingredients
+            </h2>
+            <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+              Add and remove base ingredients used by products.
+            </p>
           </div>
-          <button onClick={onClose} className="rounded-xl border px-3 py-1.5 text-sm hover:bg-gray-50">Back</button>
+          <button
+            onClick={onClose}
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--card-muted)] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+          >
+            <XIcon className="h-4.5 w-4.5" />
+          </button>
         </div>
 
-        {/* Toolbar */}
-        <div className="mb-3 flex items-center gap-2 px-5">
-          <input
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="Search ingredient..."
-            className="flex-1 rounded-xl border px-3 py-2 text-sm"
-          />
-        </div>
-
-        {/* Body */}
-        <div className="max-h-[70vh] overflow-y-auto p-5 space-y-4">
-          {/* Add new */}
-          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
-            <div className="mb-2 text-sm font-medium">Add ingredient</div>
-            <div className="flex items-center gap-2">
+        <div className="space-y-5 p-6">
+          <div className="grid gap-4 md:grid-cols-[1fr_auto]">
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Search ingredient..."
+              className="rs-input"
+            />
+            <div className="flex gap-2">
               <input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="e.g. Vodka"
-                className="flex-1 rounded-xl border px-3 py-2 text-sm"
+                className="rs-input min-w-[220px]"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleAdd();
                 }}
               />
-              <button
+              <Button
                 onClick={handleAdd}
                 disabled={!newName.trim() || busyCreate}
-                className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
+                <PlusIcon className="h-4 w-4" />
                 {busyCreate ? "Adding..." : "Add"}
-              </button>
+              </Button>
             </div>
           </div>
 
-          {/* List */}
-          <div className="rounded-2xl border border-gray-200 bg-white">
-            <div className="flex items-center justify-between border-b p-3 text-sm font-medium">
+          {error ? (
+            <div className="rounded-2xl border border-[var(--destructive)] bg-[var(--warning-surface)] p-4 text-sm text-[var(--destructive)]">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="rounded-[28px] border border-[var(--border)] bg-[var(--card-muted)]">
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 text-sm font-semibold text-[var(--foreground)]">
               <span>All ingredients</span>
-              {loading && <span className="text-xs text-gray-500">Loading...</span>}
+              {loading ? (
+                <span className="text-xs text-[var(--muted-foreground)]">
+                  Loading...
+                </span>
+              ) : null}
             </div>
 
-            {error && (
-              <div className="px-3 py-2 text-sm text-red-600">{error}</div>
-            )}
+            <ul className="max-h-[55vh] overflow-auto p-3">
+              {filtered.length === 0 && !loading ? (
+                <li className="px-2 py-8 text-center text-sm text-[var(--muted-foreground)]">
+                  No ingredients yet
+                </li>
+              ) : null}
 
-            <ul className="max-h-[55vh] overflow-auto p-2">
-              {filtered.length === 0 && !loading && (
-                <li className="px-2 py-8 text-center text-sm text-gray-500">No ingredients yet</li>
-              )}
               {filtered.map((ing) => (
-                <li key={ing.ingredientId} className="group flex items-center justify-between rounded-xl p-2 hover:bg-gray-50">
-                  <div className="truncate text-sm">{ing.name}</div>
-                  <button
+                <li
+                  key={ing.ingredientId}
+                  className="group flex items-center justify-between rounded-2xl border border-transparent bg-[var(--card)] p-4 transition hover:border-[var(--border)]"
+                >
+                  <div className="truncate text-sm font-medium text-[var(--foreground)]">
+                    {ing.name}
+                  </div>
+                  <Button
+                    variant="secondary"
                     onClick={() => handleRemove(ing.ingredientId)}
                     disabled={busyRemove === ing.ingredientId}
-                    className="invisible rounded-xl border px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 group-hover:visible disabled:opacity-50"
-                    title="Remove"
                   >
                     {busyRemove === ing.ingredientId ? "Removing..." : "Remove"}
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>

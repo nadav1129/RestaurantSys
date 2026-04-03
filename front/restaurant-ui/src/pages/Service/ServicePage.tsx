@@ -1,20 +1,16 @@
-// src/pages/ServicePage.tsx
 import { useEffect, useMemo, useState } from "react";
 import SecondaryBar from "../../components/SecondaryBar";
 import BarPage from "./BarPage";
 import HostessPage from "./HostessPage";
 import CheckerPage from "./CheckerPage";
-//import InventoryPage from "../Temp/InventoryPage";
 import { apiFetch } from "../../api/api";
 import type { Station } from "../../types/index";
-
-/* ===== Backend DTO ===== */
+import { EmptyState, PageContainer } from "../../components/ui/layout";
 
 export default function ServicePage({
-  /* keep props for compatibility, but we’ll load from API */
   activeStationId,
   onStationChange,
-  onOpenOrderForTable, /* <- parent provides this, we forward to table-based stations */
+  onOpenOrderForTable,
 }: {
   activeStationId?: string;
   onStationChange?: (id: string) => void;
@@ -24,7 +20,6 @@ export default function ServicePage({
   const [activeId, setActiveId] = useState<string | undefined>(activeStationId);
   const [loading, setLoading] = useState(false);
 
-  /* load stations from backend */
   useEffect(() => {
     (async () => {
       try {
@@ -33,7 +28,6 @@ export default function ServicePage({
           method: "GET",
         })) as Station[] | null;
         setStations(data ?? []);
-        /* set default active if none selected */
         if (!activeStationId && (data?.length ?? 0) > 0) {
           setActiveId(data![0].stationId);
         }
@@ -45,7 +39,6 @@ export default function ServicePage({
     })();
   }, [activeStationId]);
 
-  /* keep external selection in sync if parent changes it */
   useEffect(() => {
     if (activeStationId) setActiveId(activeStationId);
   }, [activeStationId]);
@@ -71,18 +64,27 @@ export default function ServicePage({
 
   function renderActive() {
     if (!activeStation) {
-      if (loading)
+      if (loading) {
         return (
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 text-gray-600">
-            Loading stations…
-          </div>
+          <PageContainer>
+            <div className="rs-surface p-6 text-sm text-[var(--muted-foreground)]">
+              Loading stations...
+            </div>
+          </PageContainer>
         );
+      }
+
       return (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-amber-900">
-          {stations.length === 0
-            ? "No stations yet."
-            : "Choose a station to get station-specific shortcuts and views."}
-        </div>
+        <PageContainer>
+          <EmptyState
+            title={stations.length === 0 ? "No stations yet" : "Choose a station"}
+            description={
+              stations.length === 0
+                ? "Once stations are available, they’ll appear here in the redesigned service navigation."
+                : "Pick a station from the bar above to load its service-specific tools."
+            }
+          />
+        </PageContainer>
       );
     }
 
@@ -100,17 +102,17 @@ export default function ServicePage({
         return <HostessPage stationId={activeStation.stationId} />;
       case "Checker":
         return <CheckerPage />;
-      /* placeholders for the rest */
       case "Kitchen":
       case "Storage":
       case "Managment":
         return (
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 text-gray-700">
-            {activeStation.stationType} page coming soon.
-          </div>
+          <PageContainer>
+            <EmptyState
+              title={`${activeStation.stationType} workspace coming soon`}
+              description="The service shell is ready, and this station type can plug into it when its frontend is implemented."
+            />
+          </PageContainer>
         );
-      //default:
-        //return <InventoryPage />;
     }
   }
 
@@ -123,7 +125,7 @@ export default function ServicePage({
         onChange={handleChange}
         topOffsetClass="top-0"
       />
-      <div className="mx-auto max-w-[1400px] px-4 py-6">{renderActive()}</div>
+      <div className="pb-8">{renderActive()}</div>
     </>
   );
 }

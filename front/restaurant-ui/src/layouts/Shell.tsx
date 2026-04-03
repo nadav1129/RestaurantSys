@@ -3,7 +3,6 @@ import React from "react";
 import TopBar from "../components/TopBar";
 import Sidebar from "../components/Sidebar";
 import ScrollView from "../components/ScrollView";
-import Button from "../components/Button";
 import type { Page } from "../types";
 
 type Props = {
@@ -20,26 +19,11 @@ export default function Shell({
   onQuickOrder,
 }: Props) {
   return (
-    <div className="flex h-screen w-full flex-col">
-      <TopBar current={page} onNavigate={setPage} />
-      <div className="flex flex-1">
-        <Sidebar title="Quick Actions" defaultOpen>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              try {
-                sessionStorage.removeItem("lastTableNum");
-                sessionStorage.removeItem("lastTableId");
-              } catch {}
+    <div className="flex h-full w-full bg-app text-[var(--foreground)]">
+      <Sidebar page={page} setPage={setPage} onQuickOrder={onQuickOrder} />
 
-              onQuickOrder();
-            }}
-          >
-            Quick Order
-          </Button>
-          {/* add more buttons / links as needed */}
-        </Sidebar>
-
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar current={page} onNavigate={setPage} />
         <ScrollView>{children}</ScrollView>
       </div>
     </div>
