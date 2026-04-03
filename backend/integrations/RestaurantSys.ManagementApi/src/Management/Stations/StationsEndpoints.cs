@@ -7,7 +7,7 @@ namespace RestaurantSys.Api.Endpoints;
 
 public static class StationsEndpoints
 {
-    // allowed station types – keep in sync with front + SQL
+    // allowed station types â€“ keep in sync with front + SQL
     static readonly HashSet<string> StationTypes = new(StringComparer.Ordinal)
     {
     "Bar",
@@ -38,8 +38,20 @@ public static class StationsEndpoints
             try
             {
                 const string sql = @"
-            SELECT station_id, station_name, station_type
-            FROM stations
+            SELECT
+                s.station_id,
+                s.station_name,
+                s.station_type,
+                s.revenue_center_id,
+                rc.name,
+                s.checker_revenue_center_id,
+                crc.name,
+                s.checker_print_enabled
+            FROM stations s
+            LEFT JOIN revenue_centers rc
+              ON rc.revenue_center_id = s.revenue_center_id
+            LEFT JOIN revenue_centers crc
+              ON crc.revenue_center_id = s.checker_revenue_center_id
             ORDER BY station_name;
         ";
 
@@ -54,7 +66,12 @@ public static class StationsEndpoints
                     {
                         StationId = reader.GetGuid(0),
                         StationName = reader.GetString(1),
-                        StationType = reader.GetString(2)
+                        StationType = reader.GetString(2),
+                        RevenueCenterId = reader.IsDBNull(3) ? (Guid?)null : reader.GetGuid(3),
+                        RevenueCenterName = reader.IsDBNull(4) ? null : reader.GetString(4),
+                        CheckerRevenueCenterId = reader.IsDBNull(5) ? (Guid?)null : reader.GetGuid(5),
+                        CheckerRevenueCenterName = reader.IsDBNull(6) ? null : reader.GetString(6),
+                        CheckerPrintEnabled = !reader.IsDBNull(7) && reader.GetBoolean(7)
                     });
                 }
 
@@ -117,7 +134,8 @@ public static class StationsEndpoints
                 {
                     StationId = reader.GetGuid(0),
                     StationName = reader.GetString(1),
-                    StationType = reader.GetString(2)
+                    StationType = reader.GetString(2),
+                    CheckerPrintEnabled = false
                 };
 
                 return Results.Json(dto, jsonOptionsCamel);
@@ -159,3 +177,4 @@ public static class StationsEndpoints
         });
     }
 }
+

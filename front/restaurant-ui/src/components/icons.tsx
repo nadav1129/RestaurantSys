@@ -201,6 +201,18 @@ export function ListsIcon(props: IconProps) {
   );
 }
 
+export function RevenueCenterIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M4 7.5h16" />
+      <path d="M8 7.5v9" />
+      <path d="M16 7.5v9" />
+      <path d="M4 16.5h16" />
+      <path d="M12 4.5v15" />
+    </BaseIcon>
+  );
+}
+
 export function PaletteIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>

@@ -44,7 +44,12 @@ export default function App() {
           />
         );
       case "order":
-        return <OrderPage />;
+        return (
+          <OrderPage
+            initialTableId={currentTable !== "none" ? currentTable : null}
+            originStationId={activeStationId ?? null}
+          />
+        );
       case "settings":
         return <SettingsPage />;
       case "management":
@@ -62,7 +67,10 @@ export default function App() {
     <Shell
       page={page}
       setPage={setPage}
-      onQuickOrder={() => setPage("order")}
+      onQuickOrder={() => {
+        setCurrentTable("none");
+        setPage("order");
+      }}
     >
       {renderPage()}
     </Shell>

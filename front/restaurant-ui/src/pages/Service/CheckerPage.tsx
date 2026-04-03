@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Button from "../../components/Button";
 import { apiFetch } from "../../api/api";
+import type { CheckerStationSettings, Station } from "../../types";
 
 /* One meal line inside an order */
 type MealLine = {
@@ -44,7 +45,7 @@ type CheckerState = {
   queue: CheckerOrder[];
 };
 
-export default function CheckerPage() {
+export default function CheckerPage({ station }: { station?: Station }) {
   /* Single state object to avoid nested setState issues */
   const [checker, setChecker] = useState<CheckerState>({
     main: [],
@@ -55,6 +56,8 @@ export default function CheckerPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [colorsEnabled, setColorsEnabled] = useState(true);
+  const [printEnabled, setPrintEnabled] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [confirm, setConfirm] = useState<ConfirmConfig | null>(null);
 
@@ -115,7 +118,9 @@ export default function CheckerPage() {
       setLoading(true);
       setError(null);
 
-      const data = (await apiFetch("/api/checker/orders")) as CheckerOrder[];
+      const data = (await apiFetch("/api/checker/orders", {
+        query: station?.stationId ? { stationId: station.stationId } : undefined,
+      })) as CheckerOrder[];
 
       setChecker({
         main: Array.isArray(data) ? data : [],
@@ -130,8 +135,69 @@ export default function CheckerPage() {
   };
 
   useEffect(() => {
-    loadOrders();
-  }, []);
+    void loadOrders();
+  }, [station?.stationId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSettings() {
+      if (!station?.stationId) {
+        if (!cancelled) {
+          setPrintEnabled(false);
+          setSettingsLoaded(true);
+        }
+        return;
+      }
+
+      try {
+        const data = (await apiFetch(
+          `/api/stations/${station.stationId}/checker-settings`
+        )) as CheckerStationSettings | null;
+
+        if (!cancelled) {
+          setPrintEnabled(!!data?.printEnabled);
+          setSettingsLoaded(true);
+        }
+      } catch (e) {
+        console.error("Failed to load checker settings", e);
+        if (!cancelled) {
+          setPrintEnabled(false);
+          setSettingsLoaded(true);
+        }
+      }
+    }
+
+    setSettingsLoaded(false);
+    void loadSettings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [station?.stationId]);
+
+  async function togglePrint() {
+    const next = !printEnabled;
+    setPrintEnabled(next);
+
+    if (!station?.stationId) return;
+
+    try {
+      const saved = (await apiFetch(
+        `/api/stations/${station.stationId}/checker-settings`,
+        {
+          method: "PUT",
+          body: { printEnabled: next },
+        }
+      )) as CheckerStationSettings | null;
+
+      setPrintEnabled(!!saved?.printEnabled);
+    } catch (e: any) {
+      console.error("Failed to save print setting", e);
+      setPrintEnabled((prev) => !prev);
+      setError(e?.message ?? "Failed to save print setting");
+    }
+  }
 
   /* - : revert ONE prepared portion (if any) */
   const removePrepared = (
@@ -337,6 +403,14 @@ export default function CheckerPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={togglePrint}
+                disabled={!settingsLoaded}
+              >
+                Print: {printEnabled ? "On" : "Off"}
+              </Button>
               <Button
                 type="button"
                 variant="ghost"

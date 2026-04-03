@@ -37,7 +37,7 @@ export default function SecondaryBar({
               </div>
             ) : null}
             <div className="text-xs text-[var(--muted-foreground)]">
-              {description ?? "Switch stations without leaving the current service workspace."}
+              {description ?? "Switch stations."}
             </div>
           </div>
         </div>

@@ -28,6 +28,14 @@ builder.Services.AddSingleton<Npgsql.NpgsqlDataSource>(_ =>
 builder.Services.AddHttpClient();
 
 builder.Services.AddSingleton<IIdempotencyStore, PgIdempotencyStore>();
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .SetIsOriginAllowed(_ => true));
+});
 
 /* LLM brain that will call your ManagementApi via tool-calling.
  * Make sure you added LlmOrchestrator.cs to the project. */
@@ -56,6 +64,50 @@ builder.Services.AddLlmToolsFromAssembly(typeof(ShiftControlTool).Assembly);
 
 
 var app = builder.Build();
+app.UseCors();
+
+/* -------------------------------------------------
+ * Web chat API for the frontend assistant page
+ * ------------------------------------------------- */
+app.MapGet("/api/chat/health", () => Results.Json(new
+{
+    status = "ok",
+    provider = "whatsapp-llm"
+}));
+
+app.MapPost("/api/chat/message", async (
+    HttpRequest req,
+    ILoggerFactory lf,
+    LlmOrchestrator llm) =>
+{
+    var log = lf.CreateLogger("WebChat");
+
+    try
+    {
+        var body = await req.ReadFromJsonAsync<WebChatRequest>();
+        var text = (body?.Message ?? string.Empty).Trim();
+        if (text.Length == 0)
+        {
+            return Results.BadRequest(new { error = "message is required." });
+        }
+
+        var sessionId = string.IsNullOrWhiteSpace(body?.SessionId)
+            ? "web-ui"
+            : body!.SessionId!.Trim();
+
+        var reply = await llm.HandleInboundAsync(sessionId, text, req.HttpContext.RequestAborted);
+
+        return Results.Json(new WebChatResponse
+        {
+            Reply = reply
+        });
+    }
+    catch (Exception ex)
+    {
+        log.LogError(ex, "Web chat error");
+        return Results.Problem("Chat request failed.");
+    }
+});
 
 /* -------------------------------------------------
  * Health
@@ -263,6 +315,17 @@ app.MapPost("/webhook/whatsapp", async (
 });
 
 app.Run();
+
+internal sealed class WebChatRequest
+{
+    public string? SessionId { get; init; }
+    public string? Message { get; init; }
+}
+
+internal sealed class WebChatResponse
+{
+    public string Reply { get; init; } = string.Empty;
+}
 
 /* -------------------------------------------------
  * Notes:

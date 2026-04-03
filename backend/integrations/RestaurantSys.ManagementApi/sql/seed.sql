@@ -292,6 +292,29 @@ FROM (
 ) AS seeded(station_id, station_name, station_type)
 WHERE NOT EXISTS (SELECT 1 FROM stations);
 
+/* ===== Revenue centers ===== */
+
+INSERT INTO revenue_centers (revenue_center_id, name)
+VALUES
+  ('77777777-7777-7777-7777-777777777001'::uuid, 'Main Service')
+ON CONFLICT (revenue_center_id) DO NOTHING;
+
+UPDATE stations
+SET revenue_center_id = '77777777-7777-7777-7777-777777777001'::uuid
+WHERE station_id IN (
+  '33333333-3333-3333-3333-333333333001'::uuid,
+  '33333333-3333-3333-3333-333333333002'::uuid,
+  '33333333-3333-3333-3333-333333333003'::uuid
+)
+  AND station_type IN ('Bar', 'Floor')
+  AND revenue_center_id IS NULL;
+
+UPDATE stations
+SET checker_revenue_center_id = '77777777-7777-7777-7777-777777777001'::uuid
+WHERE station_id = '33333333-3333-3333-3333-333333333005'::uuid
+  AND station_type = 'Checker'
+  AND checker_revenue_center_id IS NULL;
+
 /* ===== Lists and names ===== */
 
 INSERT INTO lists (list_id, title, list_type)

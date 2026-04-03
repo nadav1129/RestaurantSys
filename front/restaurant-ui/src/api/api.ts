@@ -1,9 +1,14 @@
 // front/src/api/api.ts
 const FALLBACK_LOCAL = "http://localhost:8080";
+const ASSISTANT_FALLBACK_LOCAL = "http://localhost:8081";
 
 export const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ??
   (import.meta.env.DEV ? FALLBACK_LOCAL : "");
+
+export const ASSISTANT_API_BASE =
+  (import.meta.env.VITE_ASSISTANT_API_BASE as string | undefined)?.replace(/\/$/, "") ??
+  (import.meta.env.DEV ? ASSISTANT_FALLBACK_LOCAL : API_BASE);
 
   if (!API_BASE && !import.meta.env.DEV) {
   throw new Error("VITE_API_BASE is missing. Set it in Amplify env vars.");
@@ -35,10 +40,22 @@ function isNativeBody(b: unknown): b is
 }
 
 export async function apiFetch<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
+  return fetchFromBase<T>(API_BASE, path, options);
+}
+
+export async function assistantFetch<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
+  return fetchFromBase<T>(ASSISTANT_API_BASE, path, options);
+}
+
+async function fetchFromBase<T>(
+  base: string,
+  path: string,
+  options: ApiOptions = {}
+): Promise<T> {
   const { body, headers, query, ...rest } = options;
 
   // Build URL with optional query params
-  let url = `${API_BASE}${path}`;
+  let url = `${base}${path}`;
   if (query && Object.keys(query).length) {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(query)) {

@@ -6,11 +6,13 @@ import ListsPage from "../Service/Lists/ListsPage";
 import DashboardPage from "./DashboardPage";
 import StaffPage from "./StaffPage";
 import AnalyticsPage from "./AnalyticsPage";
+import RevenueCentersPage from "./RevenueCentersPage";
 import {
   AnalyticsIcon,
   ListsIcon,
   ManagementIcon,
   MenuIcon,
+  RevenueCenterIcon,
   SettingsIcon,
   StaffIcon,
   StationsIcon,
@@ -23,6 +25,7 @@ const tabs = [
   { id: "analytics", label: "Analytics", icon: AnalyticsIcon },
   { id: "menu", label: "Menu Builder", icon: MenuIcon },
   { id: "stations", label: "Stations", icon: StationsIcon },
+  { id: "revenue-centers", label: "Revenue Centers", icon: RevenueCenterIcon },
   { id: "lists", label: "Lists", icon: ListsIcon },
   { id: "staff", label: "Staff", icon: StaffIcon },
   { id: "settings", label: "Settings", icon: SettingsIcon },
@@ -42,8 +45,7 @@ export default function ManagementPage() {
     <PageContainer className="space-y-6">
       <PageHeader
         eyebrow="Management"
-        title="Operations Center"
-        description="A calmer control surface for shift oversight, menu structure, staffing, and restaurant configuration."
+        title="Management"
         actions={
           <div className="rs-pill">
             {hasActiveShift ? "Shift active" : "Shift not started"}
@@ -87,6 +89,7 @@ export default function ManagementPage() {
         {activeTab === "analytics" && <AnalyticsPage />}
         {activeTab === "menu" && <MenuPage />}
         {activeTab === "stations" && <StationsPage />}
+        {activeTab === "revenue-centers" && <RevenueCentersPage />}
         {activeTab === "lists" && <ListsPage />}
         {activeTab === "staff" && <StaffPage />}
         {activeTab === "settings" && <ManagementSettingsPage />}

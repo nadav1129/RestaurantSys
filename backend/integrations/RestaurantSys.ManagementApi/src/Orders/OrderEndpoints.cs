@@ -76,6 +76,9 @@ public static class OrderEndpoints
                 var guestPhone = GetString(body, "guestPhone");
                 var dinersCount = GetInt(body, "dinersCount");
                 var note = GetString(body, "note");
+                Guid? originStationId = TryGetGuid(body, "originStationId", out var originStationGuid) && originStationGuid != Guid.Empty
+                    ? originStationGuid
+                    : (Guid?)null;
 
                 /* items */
                 if (!body.TryGetProperty("items", out var itemsEl) ||itemsEl.ValueKind != JsonValueKind.Array ||itemsEl.GetArrayLength() == 0)
@@ -107,6 +110,8 @@ public static class OrderEndpoints
                     }
                 }
 
+                var route = await OrderRoutingResolver.ResolveAsync(conn, originStationId, tx);
+
                 Guid orderId;
 
                 /* Find/create open order:
@@ -122,10 +127,15 @@ public static class OrderEndpoints
                   and table_id is null
                   and status = 'open'
                   and source = 'quick'
+                  and (
+                        (@origin_station_id is null and origin_station_id is null)
+                     or origin_station_id = @origin_station_id
+                  )
                 limit 1;";
 
                     await using var findCmd = new NpgsqlCommand(FIND_QUICK, conn, tx);
                     findCmd.Parameters.AddWithValue("shift_id", shiftId);
+                    findCmd.Parameters.AddWithValue("origin_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)originStationId ?? DBNull.Value);
 
                     var found = await findCmd.ExecuteScalarAsync();
                     if (found is Guid fg)
@@ -136,15 +146,17 @@ public static class OrderEndpoints
                     {
                         const string INSERT_QUICK = @"
                     insert into orders
-                      (shift_id, table_id, opened_by_worker_id, source, status,
+                      (shift_id, table_id, opened_by_worker_id, origin_station_id, checker_station_id, source, status,
                        opened_at, guest_name, guest_phone, diners_count, note)
                     values
-                      (@shift_id, null, null, 'quick', 'open',
+                      (@shift_id, null, null, @origin_station_id, @checker_station_id, 'quick', 'open',
                        now(), @guest_name, @guest_phone, @diners_count, @note)
                     returning order_id;";
 
                         await using var insertCmd = new NpgsqlCommand(INSERT_QUICK, conn, tx);
                         insertCmd.Parameters.AddWithValue("shift_id", shiftId);
+                        insertCmd.Parameters.AddWithValue("origin_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)originStationId ?? DBNull.Value);
+                        insertCmd.Parameters.AddWithValue("checker_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)route.CheckerStationId ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("guest_name", (object?)guestName ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("guest_phone", (object?)guestPhone ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("diners_count", (object?)dinersCount ?? DBNull.Value);
@@ -182,16 +194,18 @@ public static class OrderEndpoints
                     {
                         const string INSERT_TABLE = @"
                     insert into orders
-                      (shift_id, table_id, opened_by_worker_id, source, status,
+                      (shift_id, table_id, opened_by_worker_id, origin_station_id, checker_station_id, source, status,
                        opened_at, guest_name, guest_phone, diners_count, note)
                     values
-                      (@shift_id, @table_id, null, 'table', 'open',
+                      (@shift_id, @table_id, null, @origin_station_id, @checker_station_id, 'table', 'open',
                        now(), @guest_name, @guest_phone, @diners_count, @note)
                     returning order_id;";
 
                         await using var insertCmd = new NpgsqlCommand(INSERT_TABLE, conn, tx);
                         insertCmd.Parameters.AddWithValue("shift_id", shiftId);
                         insertCmd.Parameters.AddWithValue("table_id", tableId.Value);
+                        insertCmd.Parameters.AddWithValue("origin_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)originStationId ?? DBNull.Value);
+                        insertCmd.Parameters.AddWithValue("checker_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)route.CheckerStationId ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("guest_name", (object?)guestName ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("guest_phone", (object?)guestPhone ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("diners_count", (object?)dinersCount ?? DBNull.Value);
@@ -205,6 +219,20 @@ public static class OrderEndpoints
                         }
                         orderId = og;
                     }
+                }
+
+                const string updateRoutingSql = @"
+                    update orders
+                    set origin_station_id = coalesce(origin_station_id, @origin_station_id),
+                        checker_station_id = coalesce(checker_station_id, @checker_station_id)
+                    where order_id = @order_id;";
+
+                await using (var updateRoutingCmd = new NpgsqlCommand(updateRoutingSql, conn, tx))
+                {
+                    updateRoutingCmd.Parameters.AddWithValue("origin_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)originStationId ?? DBNull.Value);
+                    updateRoutingCmd.Parameters.AddWithValue("checker_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)route.CheckerStationId ?? DBNull.Value);
+                    updateRoutingCmd.Parameters.AddWithValue("order_id", orderId);
+                    await updateRoutingCmd.ExecuteNonQueryAsync();
                 }
 
                 /* Insert items */
@@ -252,7 +280,12 @@ public static class OrderEndpoints
                 await tx.CommitAsync();
 
                 return Results.Json(
-                    new { orderId },
+                    new
+                    {
+                        orderId,
+                        checkerStationId = route.CheckerStationId,
+                        revenueCenterId = route.RevenueCenterId
+                    },
                     new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
                 );
             }
@@ -455,6 +488,7 @@ public static class OrderEndpoints
 
                 Guid? tableId = TryGetGuid(body, "tableId", out var tId) && tId != Guid.Empty ? tId : (Guid?)null;
                 Guid? openedByWorkerId = TryGetGuid(body, "openedByWorkerId", out var wId) && wId != Guid.Empty ? wId : (Guid?)null;
+                Guid? originStationId = TryGetGuid(body, "originStationId", out var originStationGuid) && originStationGuid != Guid.Empty ? originStationGuid : (Guid?)null;
 
                 var source = GetString(body, "source")?.Trim();
                 if (string.IsNullOrEmpty(source))
@@ -465,14 +499,19 @@ public static class OrderEndpoints
                 var dinersCount = GetInt(body, "dinersCount");
                 var note = GetString(body, "note");
                 var minSpend = GetInt(body, "minSpendCents");
+                Guid? checkerStationId = null;
+
+                await using var conn = await db.OpenConnectionAsync();
+                var route = await OrderRoutingResolver.ResolveAsync(conn, originStationId);
+                checkerStationId = route.CheckerStationId;
 
                 const string sql = @"
                     insert into orders
-                      (shift_id, table_id, opened_by_worker_id, source, status,
+                      (shift_id, table_id, opened_by_worker_id, origin_station_id, checker_station_id, source, status,
                        opened_at, guest_name, guest_phone, diners_count, note,
                        min_spend_cents)
                     values
-                      (@shift_id, @table_id, @opened_by_worker_id, @source, 'open',
+                      (@shift_id, @table_id, @opened_by_worker_id, @origin_station_id, @checker_station_id, @source, 'open',
                        now(), @guest_name, @guest_phone, @diners_count, @note,
                        @min_spend_cents)
                     returning
@@ -480,10 +519,13 @@ public static class OrderEndpoints
                       guest_name, guest_phone, diners_count, note, min_spend_cents;
                 ";
 
-                await using var cmd = db.CreateCommand(sql);
+                await using var cmd = conn.CreateCommand();
+                cmd.CommandText = sql;
                 cmd.Parameters.AddWithValue("shift_id", shiftId);
                 cmd.Parameters.AddWithValue("table_id", (object?)tableId ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("opened_by_worker_id", (object?)openedByWorkerId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("origin_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)originStationId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("checker_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)checkerStationId ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("source", source);
                 cmd.Parameters.AddWithValue("guest_name", (object?)guestName ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("guest_phone", (object?)guestPhone ?? DBNull.Value);

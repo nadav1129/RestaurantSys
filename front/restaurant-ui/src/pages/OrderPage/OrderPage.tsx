@@ -63,6 +63,7 @@ type SettingsDto = {
 type OrderPageProps = {
   initialTableNum?: string | null;
   initialTableId?: string | null;
+  originStationId?: string | null;
 };
 
 type ActiveOrderItemDto = {
@@ -80,6 +81,7 @@ type ActiveOrderDto = {
 export default function OrderPage({
   initialTableNum = null,
   initialTableId = null,
+  originStationId = null,
 }: OrderPageProps) {
   /* Header fields */
   const [table, setTable] = useState<string>("");
@@ -362,6 +364,7 @@ export default function OrderPage({
         shiftId: activeShift.shiftId,
         tableNum: table !== "none" ? table : null,
         tableId,
+        originStationId,
         orderId: orderId ?? null,
         items: pending.map((x) => ({
           productId: x.id,
@@ -370,8 +373,8 @@ export default function OrderPage({
           additions: x.additions,
         })),
         guestName: guestName || null,
-        phone: phone || null,
-        diners: diners ? Number(diners) : null,
+        guestPhone: phone || null,
+        dinersCount: diners ? Number(diners) : null,
         note: note || null,
       };
       const res = await apiFetch<{ orderId: string }>("/api/orders/confirm", {

@@ -103,6 +103,16 @@ on conflict (id) do nothing;
 create index if not exists ix_management_settings_active_menu
   on public.management_settings(active_menu_num);
 
+/* Revenue centers */
+create table if not exists revenue_centers (
+  revenue_center_id uuid primary key default gen_random_uuid(),
+  name              text not null unique check (length(btrim(name)) > 0),
+  created_at        timestamptz not null default now()
+);
+
+create index if not exists ix_revenue_centers_name
+  on revenue_centers((lower(name)));
+
   /* Stations */
 CREATE TABLE IF NOT EXISTS stations (
   station_id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -122,6 +132,25 @@ CREATE TABLE IF NOT EXISTS stations (
   is_active     boolean NOT NULL DEFAULT TRUE,
   created_at    timestamptz NOT NULL DEFAULT now()
 );
+
+alter table stations
+  add column if not exists revenue_center_id uuid references revenue_centers(revenue_center_id) on delete set null;
+
+alter table stations
+  add column if not exists checker_revenue_center_id uuid references revenue_centers(revenue_center_id) on delete set null;
+
+alter table stations
+  add column if not exists checker_print_enabled boolean not null default false;
+
+create index if not exists ix_stations_revenue_center
+  on stations(revenue_center_id);
+
+create index if not exists ix_stations_checker_revenue_center
+  on stations(checker_revenue_center_id);
+
+create unique index if not exists ux_stations_checker_revenue_center
+  on stations(checker_revenue_center_id)
+  where station_type = 'Checker' and checker_revenue_center_id is not null;
 
 /* ------------------------------------------------------------
    Lists (supports two types: 'Tables' and 'Names')
@@ -307,12 +336,18 @@ CREATE TABLE IF NOT EXISTS orders (
   -- Who opened the order (device owner / station worker)
   opened_by_worker_id uuid REFERENCES workers(worker_id) ON DELETE SET NULL,
 
+  -- Which service station originated this order
+  origin_station_id uuid REFERENCES stations(station_id) ON DELETE SET NULL,
+
+  -- Which checker station should receive this order
+  checker_station_id uuid REFERENCES stations(station_id) ON DELETE SET NULL,
+
   -- Who closed/paid the order (can be same or different)
   closed_by_worker_id uuid REFERENCES workers(worker_id) ON DELETE SET NULL,
 
   -- Where this came from (matches your UI use-cases)
   source     text NOT NULL DEFAULT 'table'
-             CHECK (source IN ('table', 'bar', 'takeaway', 'delivery', 'other')),
+             CHECK (source IN ('table', 'bar', 'takeaway', 'delivery', 'other', 'quick')),
 
   status     text NOT NULL DEFAULT 'open'
              CHECK (status IN ('open', 'closed', 'cancelled')),
@@ -353,6 +388,28 @@ CREATE INDEX IF NOT EXISTS ix_orders_shift      ON orders(shift_id);
 CREATE INDEX IF NOT EXISTS ix_orders_table      ON orders(table_id);
 CREATE INDEX IF NOT EXISTS ix_orders_status     ON orders(status);
 CREATE INDEX IF NOT EXISTS ix_orders_opened_at  ON orders(opened_at);
+CREATE INDEX IF NOT EXISTS ix_orders_origin_station ON orders(origin_station_id);
+CREATE INDEX IF NOT EXISTS ix_orders_checker_station ON orders(checker_station_id);
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'orders_source_check'
+      AND conrelid = 'orders'::regclass
+  ) THEN
+    ALTER TABLE orders DROP CONSTRAINT orders_source_check;
+  END IF;
+
+  ALTER TABLE orders
+    ADD CONSTRAINT orders_source_check
+    CHECK (source IN ('table', 'bar', 'takeaway', 'delivery', 'other', 'quick'));
+EXCEPTION
+  WHEN duplicate_object THEN
+    NULL;
+END
+$$;
 
 
 /* ===== Order items ===== */

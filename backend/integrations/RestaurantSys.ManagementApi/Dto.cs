@@ -153,12 +153,56 @@ namespace RestaurantSys.Api
         public Guid StationId { get; init; }
         public string StationName { get; init; } = string.Empty;
         public string StationType { get; init; } = string.Empty;
+        public Guid? RevenueCenterId { get; init; }
+        public string? RevenueCenterName { get; init; }
+        public Guid? CheckerRevenueCenterId { get; init; }
+        public string? CheckerRevenueCenterName { get; init; }
+        public bool CheckerPrintEnabled { get; init; }
     }
 
     public sealed class CreateStationRequest
     {
         public string? StationName { get; set; }
         public string? StationType { get; set; }
+    }
+
+    public sealed class RevenueCenterStationDto
+    {
+        public Guid StationId { get; init; }
+        public string StationName { get; init; } = string.Empty;
+        public string StationType { get; init; } = string.Empty;
+    }
+
+    public sealed class RevenueCenterDto
+    {
+        public Guid RevenueCenterId { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public Guid? CheckerStationId { get; init; }
+        public string? CheckerStationName { get; init; }
+        public List<RevenueCenterStationDto> Stations { get; init; } = new();
+    }
+
+    public sealed class CreateRevenueCenterRequest
+    {
+        public string? Name { get; set; }
+    }
+
+    public sealed class UpdateRevenueCenterRequest
+    {
+        public string? Name { get; set; }
+    }
+
+    public sealed class AssignRevenueCenterStationRequest
+    {
+        public Guid StationId { get; set; }
+    }
+
+    public sealed class CheckerStationSettingsDto
+    {
+        public Guid StationId { get; init; }
+        public Guid? RevenueCenterId { get; init; }
+        public string? RevenueCenterName { get; init; }
+        public bool PrintEnabled { get; init; }
     }
 
     /* ============ Lists ============ */

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Button from "../../components/Button";
 import ServerCard from "./StationCards/ServerCard";
 import EntryCard from "./StationCards/EntryCard";
+import CheckerCard from "./StationCards/CheckerCard";
 import { apiFetch } from "../../api/api";
 import { STATION_TYPES, type StationType, type Station } from "../../types/index";
 
@@ -40,25 +41,15 @@ function StationCardRouter({ row }: { row: StationRow }) {
     );
   }
 
-  // NEW: Checker station – no extra editor, just a simple card
   if (t === "Checker") {
-    return (
-      <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-700">
-        <div className="mb-1 text-sm font-medium">
-          Checker · {row.name}
-        </div>
-        <div className="text-xs text-gray-500">
-          No configuration needed. This station uses the Checker page to manage food orders.
-        </div>
-      </div>
-    );
+    return <CheckerCard stationId={row.id} stationName={row.name} />;
   }
 
   // Placeholder for types not yet implemented
   return (
     <div className="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-600">
       <div className="mb-1 font-medium">
-        {row.type} · {row.name}
+        {row.type} - {row.name}
       </div>
       <div className="text-xs text-gray-500">
         Editor not implemented yet for this station type.
@@ -221,8 +212,8 @@ export default function StationsPage() {
           </div>
 
           <div className="mt-2 text-xs text-gray-500">
-            Types are fixed; names are yours so you can create multiple “Bar”,
-            “Floor”, etc.
+            Types are fixed; names are yours so you can create multiple "Bar",
+            "Floor", etc.
           </div>
         </div>
       )}
@@ -284,3 +275,4 @@ export default function StationsPage() {
     </div>
   );
 }
+

@@ -101,7 +101,7 @@ export default function ServicePage({
       case "selector":
         return <HostessPage stationId={activeStation.stationId} />;
       case "Checker":
-        return <CheckerPage />;
+        return <CheckerPage station={activeStation} />;
       case "Kitchen":
       case "Storage":
       case "Managment":

@@ -42,6 +42,32 @@ export type Station = {
   stationId: string;
   stationName: string;
   stationType: StationType;
+  revenueCenterId?: string | null;
+  revenueCenterName?: string | null;
+  checkerRevenueCenterId?: string | null;
+  checkerRevenueCenterName?: string | null;
+  checkerPrintEnabled?: boolean;
+};
+
+export type RevenueCenterStation = {
+  stationId: string;
+  stationName: string;
+  stationType: Extract<StationType, "Bar" | "Floor">;
+};
+
+export type RevenueCenter = {
+  revenueCenterId: string;
+  name: string;
+  checkerStationId?: string | null;
+  checkerStationName?: string | null;
+  stations: RevenueCenterStation[];
+};
+
+export type CheckerStationSettings = {
+  stationId: string;
+  revenueCenterId?: string | null;
+  revenueCenterName?: string | null;
+  printEnabled: boolean;
 };
 
 export type Meal = {

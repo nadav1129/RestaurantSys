@@ -22,42 +22,42 @@ export const pageMeta: Record<
 > = {
   home: {
     title: "Shift Hub",
-    description: "Device setup, staff shift control, and the nightly brief in one place.",
+    description: "Shift start and staff access.",
     icon: HomeIcon,
   },
   assistant: {
     title: "AI Assistant",
-    description: "A dedicated assistant workspace for service guidance, drafting, and operational support.",
+    description: "Chat with the assistant.",
     icon: SparklesIcon,
   },
   service: {
     title: "Service Stations",
-    description: "Move between active stations and keep guest-facing workflows fast and clear.",
+    description: "Station tools.",
     icon: ServiceIcon,
   },
   actions: {
     title: "Quick Actions",
-    description: "Rapid task workflows and temporary shift tools.",
+    description: "Task tools.",
     icon: QuickOrderIcon,
   },
   login: {
     title: "Staff Access",
-    description: "Claim a staff code and set up secure personal access.",
+    description: "Login setup.",
     icon: QuickOrderIcon,
   },
   management: {
     title: "Management",
-    description: "Operations, menu structure, staffing, and performance controls.",
+    description: "Menus, staff, stations.",
     icon: ManagementIcon,
   },
   settings: {
     title: "Settings",
-    description: "Appearance, workspace preferences, and operational defaults.",
+    description: "App settings.",
     icon: SettingsIcon,
   },
   order: {
     title: "Live Order",
-    description: "Create, confirm, and close orders without losing the table context.",
+    description: "Current order.",
     icon: AnalyticsIcon,
   },
 };

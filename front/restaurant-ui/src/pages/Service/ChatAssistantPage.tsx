@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import Button from "../../components/Button";
 import {
   CheckCircleIcon,
@@ -6,6 +7,8 @@ import {
   SearchIcon,
   SparklesIcon,
 } from "../../components/icons";
+import { assistantFetch } from "../../api/api";
+import { Textarea } from "../../components/ui/textarea";
 import {
   PageContainer,
   PageHeader,
@@ -14,6 +17,16 @@ import {
   StatCard,
 } from "../../components/ui/layout";
 
+type ChatEntry = {
+  role: "assistant" | "user";
+  title: string;
+  body: string;
+};
+
+type ChatReplyDto = {
+  reply: string;
+};
+
 const suggestedPrompts = [
   "Summarize open floor pressure for the next 20 minutes.",
   "Draft a hostess response for a delayed reservation.",
@@ -21,42 +34,108 @@ const suggestedPrompts = [
   "Prepare a handoff note for the next shift lead.",
 ];
 
-const transcript = [
+const initialTranscript: ChatEntry[] = [
   {
     role: "assistant",
     title: "Shift Assistant",
     body:
-      "I can help with service pacing, guest messaging, table prioritization, and shift handoff notes once the live integrations are connected.",
-  },
-  {
-    role: "user",
-    title: "You",
-    body: "What should I focus on first during a heavy service window?",
-  },
-  {
-    role: "assistant",
-    title: "Shift Assistant",
-    body:
-      "Start with bottlenecks that affect guest perception fastest: delayed greeting, stalled drinks, and tables waiting on payment. This screen is decorative for now, so no live actions are triggered yet.",
+      "I’m connected through the existing WhatsApp assistant service now, so you can ask for operational guidance, drafting help, and tool-backed actions from here.",
   },
 ];
 
+function getSessionId() {
+  try {
+    const existing = sessionStorage.getItem("assistantSessionId");
+    if (existing) return existing;
+
+    const next = `web-${crypto.randomUUID()}`;
+    sessionStorage.setItem("assistantSessionId", next);
+    return next;
+  } catch {
+    return "web-ui";
+  }
+}
+
 export default function ChatAssistantPage() {
+  const [transcript, setTranscript] = useState<ChatEntry[]>(initialTranscript);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const sessionId = useMemo(() => getSessionId(), []);
+
+  async function sendMessage(message: string) {
+    const trimmed = message.trim();
+    if (!trimmed || sending) return;
+
+    const userEntry: ChatEntry = {
+      role: "user",
+      title: "You",
+      body: trimmed,
+    };
+
+    setTranscript((prev) => [...prev, userEntry]);
+    setDraft("");
+    setSending(true);
+    setError(null);
+
+    try {
+      const res = await assistantFetch<ChatReplyDto>("/api/chat/message", {
+        method: "POST",
+        body: {
+          sessionId,
+          message: trimmed,
+        },
+      });
+
+      setTranscript((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          title: "Shift Assistant",
+          body: res?.reply?.trim() || "I didn’t get a usable reply back.",
+        },
+      ]);
+    } catch (e: any) {
+      console.error("Assistant request failed", e);
+      setError(e?.message ?? "Failed to reach the assistant service.");
+      setTranscript((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          title: "Shift Assistant",
+          body:
+            "I couldn’t reach the WhatsApp assistant service just now. Check that the assistant API is running and try again.",
+        },
+      ]);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function handlePromptClick(prompt: string) {
+    setDraft(prompt);
+  }
+
+  async function handleSubmit() {
+    await sendMessage(draft);
+  }
+
   return (
     <PageContainer className="space-y-6">
       <PageHeader
         eyebrow="Service Assistant"
         title="Agent Chat Workspace"
-        description="Decorative service-side assistant surface for quick guidance, drafting, and operational prompts. This version has no backend logic yet."
+        description="This workspace now talks to the existing WhatsApp assistant service, so the same LLM and tool flow can be used from the UI."
         actions={
           <>
             <Pill>
               <SparklesIcon className="h-4 w-4" />
-              Assistant preview
+              WhatsApp LLM
             </Pill>
             <Pill>
               <ClockIcon className="h-4 w-4" />
-              No live execution
+              Live assistant
             </Pill>
           </>
         }
@@ -65,26 +144,27 @@ export default function ChatAssistantPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard
           label="Mode"
-          value="Decor Only"
-          hint="The visual shell is ready before wiring in chat actions."
+          value="Live Chat"
+          hint="Messages are sent to the existing WhatsApp assistant API."
+          tone="success"
         />
         <StatCard
           label="Best For"
           value="Service Ops"
-          hint="Guest comms, pacing suggestions, and handoff drafting."
+          hint="Guest comms, pacing suggestions, and tool-backed restaurant actions."
           tone="success"
         />
         <StatCard
-          label="Safety"
-          value="No logic"
-          hint="No API calls, no writes, and no automation are triggered here."
+          label="Session"
+          value="Web Linked"
+          hint="The UI keeps a lightweight web session id for assistant continuity."
         />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_340px]">
         <SectionCard
           title="Conversation"
-          description="A staged transcript showing how the assistant area can look inside service."
+          description="Ask directly here and the prompt is handled by the existing WhatsApp assistant backend."
           contentClassName="space-y-4"
         >
           <div className="space-y-3">
@@ -112,7 +192,7 @@ export default function ChatAssistantPage() {
                   </div>
                   <div
                     className={[
-                      "mt-2 text-sm leading-6",
+                      "mt-2 whitespace-pre-wrap text-sm leading-6",
                       assistant
                         ? "text-[var(--foreground)]"
                         : "text-[var(--accent-foreground)]",
@@ -133,17 +213,30 @@ export default function ChatAssistantPage() {
               </Pill>
               <Pill>
                 <HelpIcon className="h-4 w-4" />
-                Service guidance
+                WhatsApp API connected
               </Pill>
             </div>
 
-            <div className="rs-textarea min-h-[120px]">
-              Ask the service assistant for coaching, drafting help, or a quick operational summary...
-            </div>
+            <Textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Ask the service assistant for coaching, drafting help, or a quick operational summary..."
+              className="min-h-[140px]"
+            />
+
+            {error ? (
+              <div className="mt-3 rounded-2xl border border-[var(--destructive)] bg-[var(--warning-surface)] px-4 py-3 text-sm text-[var(--destructive)]">
+                {error}
+              </div>
+            ) : null}
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="secondary">Attach shift context</Button>
-              <Button>Send</Button>
+              <Button variant="secondary" onClick={() => setDraft("")} disabled={sending || !draft}>
+                Clear
+              </Button>
+              <Button onClick={() => void handleSubmit()} disabled={sending || !draft.trim()}>
+                {sending ? "Sending..." : "Send"}
+              </Button>
             </div>
           </div>
         </SectionCard>
@@ -151,13 +244,14 @@ export default function ChatAssistantPage() {
         <div className="space-y-6">
           <SectionCard
             title="Suggested prompts"
-            description="Fast-start ideas for the future assistant."
+            description="Quick-start prompts for the WhatsApp-backed assistant."
             contentClassName="space-y-3"
           >
             {suggestedPrompts.map((prompt) => (
               <button
                 key={prompt}
                 type="button"
+                onClick={() => handlePromptClick(prompt)}
                 className="w-full rounded-[22px] border border-[var(--border)] bg-[var(--card-muted)] px-4 py-3 text-left text-sm leading-6 text-[var(--foreground)] transition hover:bg-[var(--muted)]"
               >
                 {prompt}
@@ -167,13 +261,13 @@ export default function ChatAssistantPage() {
 
           <SectionCard
             title="Assistant status"
-            description="Placeholder readiness states for future integration."
+            description="Connection state for the shared assistant backend."
             contentClassName="space-y-3"
           >
             <StatusRow label="Conversation UI" value="Ready" tone="success" />
-            <StatusRow label="Shift context" value="Planned" />
-            <StatusRow label="Tool actions" value="Not wired" />
-            <StatusRow label="Guest messaging drafts" value="Planned" />
+            <StatusRow label="WhatsApp assistant API" value="Connected path" tone="success" />
+            <StatusRow label="Tool-backed actions" value="Available through orchestrator" tone="success" />
+            <StatusRow label="Session id" value={sessionId} />
           </SectionCard>
         </div>
       </div>
@@ -191,11 +285,11 @@ function StatusRow({
   tone?: "default" | "success";
 }) {
   return (
-    <div className="flex items-center justify-between rounded-[22px] border border-[var(--border)] bg-[var(--card-muted)] px-4 py-3">
+    <div className="flex items-center justify-between gap-3 rounded-[22px] border border-[var(--border)] bg-[var(--card-muted)] px-4 py-3">
       <div className="text-sm text-[var(--foreground)]">{label}</div>
       <div
         className={[
-          "inline-flex items-center gap-2 text-sm font-medium",
+          "inline-flex items-center gap-2 text-right text-sm font-medium",
           tone === "success"
             ? "text-[var(--success)]"
             : "text-[var(--muted-foreground)]",
