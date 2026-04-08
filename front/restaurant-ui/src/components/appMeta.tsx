@@ -4,6 +4,7 @@ import {
   AnalyticsIcon,
   HomeIcon,
   ManagementIcon,
+  OrdersIcon,
   QuickOrderIcon,
   ServiceIcon,
   SettingsIcon,
@@ -50,6 +51,11 @@ export const pageMeta: Record<
     description: "Menus, staff, stations.",
     icon: ManagementIcon,
   },
+  orders: {
+    title: "Orders",
+    description: "Dashboard order flow.",
+    icon: OrdersIcon,
+  },
   settings: {
     title: "Settings",
     description: "App settings.",
@@ -69,7 +75,6 @@ export const primaryNav: Array<{
 }> = [
   { key: "home", label: "Home", icon: HomeIcon },
   { key: "service", label: "Service", icon: ServiceIcon },
-  { key: "assistant", label: "AI", icon: SparklesIcon },
+  { key: "orders", label: "Orders", icon: OrdersIcon },
   { key: "management", label: "Management", icon: ManagementIcon },
-  { key: "settings", label: "Settings", icon: SettingsIcon },
 ];

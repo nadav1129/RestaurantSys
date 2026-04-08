@@ -1,3 +1,4 @@
+import { PosPanel, PosStatusPill } from "../../components/ui/pos";
 import type { MenuNode, ProductItem } from "./OrderPage";
 
 function formatMoney(n: number | null | undefined): string {
@@ -19,36 +20,40 @@ export default function OrderMenu({
   onPickProduct,
 }: OrderMenuProps) {
   return (
-    <div className="rs-surface h-full p-5 lg:p-6">
-      <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-[var(--muted-foreground)]">
-        {path.map((n, i) => (
-          <span key={n.id} className="truncate">
-            {i > 0 ? <span className="mx-2">/</span> : null}
-            {n.name}
-          </span>
-        ))}
-      </div>
-
+    <PosPanel
+      title={current?.name ?? "Menu"}
+      description="Browse products from the active menu structure."
+      className="h-full"
+      actions={
+        <div className="flex flex-wrap gap-2">
+          {path.map((node, index) => (
+            <PosStatusPill key={node.id} tone={index === path.length - 1 ? "accent" : "default"}>
+              {node.name}
+            </PosStatusPill>
+          ))}
+        </div>
+      }
+    >
       {current && products.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
-          {products.map((p) => (
+          {products.map((product) => (
             <button
-              key={p.id}
-              className="rounded-[24px] border border-[var(--border)] bg-[var(--card-muted)] px-4 py-4 text-left transition hover:-translate-y-px hover:border-[var(--border-strong)] hover:bg-[var(--card)] hover:shadow-[var(--shadow-strong)]"
-              onClick={() => onPickProduct(p)}
+              key={product.id}
+              className="rounded-[1rem] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.88),var(--card-muted))] px-4 py-4 text-left transition hover:-translate-y-px hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-strong)]"
+              onClick={() => onPickProduct(product)}
             >
-              <div className="font-medium text-[var(--foreground)]">{p.name}</div>
+              <div className="text-base font-semibold text-[var(--foreground)]">{product.name}</div>
               <div className="mt-2 text-sm text-[var(--muted-foreground)]">
-                {p.price != null ? `₪${formatMoney(p.price)}` : "No price yet"}
+                {product.price != null ? `₪${formatMoney(product.price)}` : "No price yet"}
               </div>
             </button>
           ))}
         </div>
       ) : (
-        <div className="rounded-[26px] border border-dashed border-[var(--border-strong)] bg-[var(--card-muted)] p-6 text-sm text-[var(--muted-foreground)]">
+        <div className="rounded-[1rem] border border-dashed border-[var(--border-strong)] bg-[var(--card-muted)] p-6 text-sm text-[var(--muted-foreground)]">
           Choose a category to see products.
         </div>
       )}
-    </div>
+    </PosPanel>
   );
 }

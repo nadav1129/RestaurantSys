@@ -268,6 +268,14 @@ export function PlusIcon(props: IconProps) {
   );
 }
 
+export function LightningIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M13.5 3.5 6.8 12h4.4L10.5 20.5 17.2 12h-4.4z" />
+    </BaseIcon>
+  );
+}
+
 export function FolderTreeIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>

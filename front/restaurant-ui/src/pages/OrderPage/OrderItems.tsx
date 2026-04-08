@@ -1,5 +1,6 @@
-import type { CartItem } from "./OrderPage";
+import { PosPanel, PosStatusPill } from "../../components/ui/pos";
 import { formatMoney } from "../../utils/money";
+import type { CartItem } from "./OrderPage";
 
 type OrderItemsProps = {
   cart: CartItem[];
@@ -13,13 +14,9 @@ export default function OrderItems({
   onRequestCancel,
 }: OrderItemsProps) {
   return (
-    <div className="rs-surface h-full p-5 lg:p-6">
-      <div className="mb-4 text-lg font-semibold text-[var(--foreground)]">
-        Items
-      </div>
-
+    <PosPanel title="Items" description="Live check detail for the current order." className="h-full">
       {cart.length === 0 ? (
-        <div className="rounded-[26px] border border-dashed border-[var(--border-strong)] bg-[var(--card-muted)] py-10 text-center text-sm text-[var(--muted-foreground)]">
+        <div className="rounded-[1rem] border border-dashed border-[var(--border-strong)] bg-[var(--card-muted)] py-10 text-center text-sm text-[var(--muted-foreground)]">
           No items yet.
         </div>
       ) : (
@@ -37,13 +34,13 @@ export default function OrderItems({
             return (
               <li
                 key={item.localKey}
-                className="rounded-[24px] border border-[var(--border)] bg-[var(--card-muted)] p-4"
+                className="rounded-[1rem] border border-[var(--border)] bg-[linear-gradient(180deg,rgba(255,255,255,0.86),var(--card-muted))] p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div
                       className={[
-                        "font-medium",
+                        "text-base font-semibold",
                         isRemoved
                           ? "text-[var(--muted-foreground)] line-through"
                           : "text-[var(--foreground)]",
@@ -61,21 +58,20 @@ export default function OrderItems({
                         "{item.notes}"
                       </div>
                     ) : null}
-                    <div className="mt-2 text-sm text-[var(--muted-foreground)]">
+                    <div className="mt-3 text-sm font-medium text-[var(--foreground)]">
                       {isRemoved ? "NIS 0" : `NIS ${formatMoney(lineTotal)}`}
                     </div>
                   </div>
 
                   <div className="flex flex-col items-end gap-2">
-                    <span
-                      className={[
-                        "rounded-full px-3 py-1 text-xs font-semibold",
+                    <PosStatusPill
+                      tone={
                         isPending
-                          ? "bg-[var(--warning-surface)] text-[var(--warning)]"
+                          ? "warning"
                           : isRemoved
-                            ? "bg-[var(--border)] text-[var(--muted-foreground)]"
-                            : "bg-[var(--success-surface)] text-[var(--success)]",
-                      ].join(" ")}
+                            ? "default"
+                            : "success"
+                      }
                     >
                       {isPending
                         ? "pending"
@@ -84,11 +80,11 @@ export default function OrderItems({
                           : item.cancelRequestStatus === "requested"
                             ? "cancel requested"
                             : "confirmed"}
-                    </span>
+                    </PosStatusPill>
 
                     {isPending ? (
                       <button
-                        className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                        className="rounded-[0.9rem] border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
                         onClick={() => onRemove(index)}
                       >
                         Remove
@@ -97,7 +93,7 @@ export default function OrderItems({
 
                     {canRequestCancel ? (
                       <button
-                        className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                        className="rounded-[0.9rem] border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
                         onClick={() => onRequestCancel(item.orderItemId!)}
                       >
                         Request cancel
@@ -110,6 +106,6 @@ export default function OrderItems({
           })}
         </ul>
       )}
-    </div>
+    </PosPanel>
   );
 }

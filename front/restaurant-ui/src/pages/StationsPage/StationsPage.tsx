@@ -5,6 +5,8 @@ import EntryCard from "./StationCards/EntryCard";
 import CheckerCard from "./StationCards/CheckerCard";
 import { apiFetch } from "../../api/api";
 import { STATION_TYPES, type StationType, type Station } from "../../types/index";
+import { EmptyState, PageHeader } from "../../components/ui/layout";
+import { PosActionStrip, PosPanel, PosStatusPill } from "../../components/ui/pos";
 
 
 type StationRow = {
@@ -160,15 +162,14 @@ export default function StationsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1000px] px-4 py-4">
-      {/* Header */}
-      <div className="mb-4">
-        <div className="text-xs font-medium text-gray-500">Management</div>
-        <div className="text-lg font-semibold text-gray-800">Stations</div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Management"
+        title="Stations"
+        description="Configure station workspaces without changing the existing station logic."
+      />
 
-      {/* Top actions */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <PosActionStrip>
         <Button onClick={() => setAddOpen((v) => !v)}>+ Add Station</Button>
         <Button
           variant="secondary"
@@ -177,15 +178,17 @@ export default function StationsPage() {
         >
           Delete Selected
         </Button>
-      </div>
+      </PosActionStrip>
 
-      {/* Add panel */}
       {addOpen && (
-        <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="mb-2 text-sm font-medium">Create a new station</div>
+        <PosPanel
+          title="Create a new station"
+          description="Station types stay fixed; you control the station names and layout structure."
+          tone="soft"
+        >
           <div className="flex flex-wrap items-center gap-2">
             <select
-              className="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm"
+              className="rs-select max-w-[220px]"
               value={addType}
               onChange={(e) => setAddType(e.target.value as StationType)}
             >
@@ -197,7 +200,7 @@ export default function StationsPage() {
             </select>
 
             <input
-              className="w-56 rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm"
+              className="rs-input w-full max-w-[320px]"
               placeholder="Station name (e.g. Bar #1 / Front)"
               value={addName}
               onChange={(e) => setAddName(e.target.value)}
@@ -215,26 +218,25 @@ export default function StationsPage() {
             Types are fixed; names are yours so you can create multiple "Bar",
             "Floor", etc.
           </div>
-        </div>
+        </PosPanel>
       )}
 
-      {/* List */}
       <div className="space-y-3">
         {rows.length === 0 ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 text-sm text-gray-500">
-            No stations yet. Click{" "}
-            <span className="font-medium">+ Add Station</span> to start.
-          </div>
+          <EmptyState
+            title="No stations yet"
+            description='Click "+ Add Station" to create your first station workspace.'
+          />
         ) : (
           rows.map((row) => {
             const isOpen = !!open[row.id];
             return (
-              <div
+              <PosPanel
                 key={row.id}
-                className="rounded-2xl border border-gray-200 bg-white"
+                className="overflow-hidden"
+                contentClassName="p-0"
               >
-                {/* Row header */}
-                <div className="flex items-center justify-between gap-3 px-4 py-3">
+                <div className="flex items-center justify-between gap-3 px-5 py-4 lg:px-6">
                   <label className="flex min-w-0 items-center gap-3">
                     <input
                       type="checkbox"
@@ -242,32 +244,31 @@ export default function StationsPage() {
                       onChange={() => toggleSelect(row.id)}
                     />
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">
+                      <div className="truncate text-base font-semibold">
                         {row.name}
                       </div>
-                      <div className="truncate text-xs text-gray-500">
-                        {row.type}
+                      <div className="mt-2">
+                        <PosStatusPill tone="accent">{row.type}</PosStatusPill>
                       </div>
                     </div>
                   </label>
 
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
+                      variant="secondary"
                       onClick={() => toggleOpen(row.id)}
-                      className="rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium hover:bg-gray-50"
                     >
                       {isOpen ? "Collapse" : "Expand"}
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
-                {/* Expanded content */}
                 {isOpen && (
-                  <div className="border-t px-4 py-3">
+                  <div className="border-t border-[var(--border)] px-5 py-5 lg:px-6">
                     <StationCardRouter row={row} />
                   </div>
                 )}
-              </div>
+              </PosPanel>
             );
           })
         )}

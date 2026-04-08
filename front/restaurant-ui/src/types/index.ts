@@ -6,6 +6,7 @@ export type Page =
 | "login"
 | "management"
 | "settings"
+| "orders"
 | "order";
 
 

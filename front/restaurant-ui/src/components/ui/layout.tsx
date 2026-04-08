@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "./card";
 import { Badge } from "./badge";
+import { PosPageHeading } from "./pos";
 
 export function PageContainer({
   children,
@@ -17,7 +18,7 @@ export function PageContainer({
   className?: string;
 }) {
   return (
-    <div className={cn("mx-auto w-full max-w-[1480px] px-4 pb-8 pt-6 lg:px-6", className)}>
+    <div className={cn("mx-auto w-full max-w-[1680px] px-4 pb-8 pt-5 lg:px-6 lg:pt-6", className)}>
       {children}
     </div>
   );
@@ -37,25 +38,13 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <div
-      className={cn(
-        "mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between",
-        className
-      )}
-    >
-      <div className="space-y-2">
-        {eyebrow ? <div className="rs-eyebrow">{eyebrow}</div> : null}
-        <div className="font-display text-3xl font-semibold tracking-tight text-[var(--foreground)]">
-          {title}
-        </div>
-        {description ? (
-          <p className="max-w-3xl text-sm leading-6 text-[var(--muted-foreground)]">
-            {description}
-          </p>
-        ) : null}
-      </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
-    </div>
+    <PosPageHeading
+      eyebrow={eyebrow}
+      title={title}
+      description={description}
+      actions={actions}
+      className={cn("mb-6", className)}
+    />
   );
 }
 
@@ -73,11 +62,11 @@ export function SectionCard({
   children: ReactNode;
   className?: string;
   contentClassName?: string;
-}) {
+  }) {
   return (
-    <Card className={className}>
+    <Card className={cn("overflow-hidden", className)}>
       {(title || description || actions) && (
-        <CardHeader className="flex flex-col gap-4 border-b border-[var(--border)] lg:flex-row lg:items-start lg:justify-between">
+        <CardHeader className="flex flex-col gap-4 border-b border-[var(--border)] bg-[color:rgba(255,255,255,0.5)] lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
             {title ? <CardTitle>{title}</CardTitle> : null}
             {description ? <CardDescription>{description}</CardDescription> : null}
@@ -104,7 +93,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "rs-kpi",
+        "rs-kpi bg-[linear-gradient(180deg,rgba(255,255,255,0.72),var(--card-muted))]",
         tone === "success" && "border-[color:var(--success-soft)] bg-[var(--success-surface)]",
         tone === "warning" && "border-[color:var(--warning-soft)] bg-[var(--warning-surface)]"
       )}

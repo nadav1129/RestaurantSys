@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import MenuPage from "../MenuPage/MenuPage";
 import ManagementSettingsPage from "./ManagementSettingsPage";
 import StationsPage from "../StationsPage/StationsPage";
 import ListsPage from "../Service/Lists/ListsPage";
 import DashboardPage from "./DashboardPage";
+import type { DashboardTab } from "./DashboardPage";
 import StaffPage from "./StaffPage";
 import AnalyticsPage from "./AnalyticsPage";
 import RevenueCentersPage from "./RevenueCentersPage";
@@ -18,6 +19,7 @@ import {
   StationsIcon,
 } from "../../components/icons";
 import { PageContainer, PageHeader } from "../../components/ui/layout";
+import { PosActionButton, PosActionStrip } from "../../components/ui/pos";
 import { cn } from "../../lib/utils";
 
 const tabs = [
@@ -33,9 +35,19 @@ const tabs = [
 
 type ManagementTab = (typeof tabs)[number]["id"];
 
-export default function ManagementPage() {
-  const [activeTab, setActiveTab] = useState<ManagementTab>("dashboard");
+export default function ManagementPage({
+  initialTab = "dashboard",
+  initialDashboardTab = "alerts",
+}: {
+  initialTab?: ManagementTab;
+  initialDashboardTab?: DashboardTab;
+}) {
+  const [activeTab, setActiveTab] = useState<ManagementTab>(initialTab);
   const [hasActiveShift, setHasActiveShift] = useState(false);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   const handleStartShift = () => {
     setHasActiveShift(true);
@@ -50,6 +62,7 @@ export default function ManagementPage() {
       <PageHeader
         eyebrow="Management"
         title="Management"
+        description="Operational controls, pricing, staffing, and shift oversight collected into one tablet workspace."
         actions={
           <div className="rs-pill">
             {hasActiveShift ? "Shift active" : "Shift not started"}
@@ -57,34 +70,27 @@ export default function ManagementPage() {
         }
       />
 
-      <section className="rs-surface p-3">
-        <div className="flex flex-wrap gap-2">
+      <PosActionStrip>
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
             return (
-              <button
+              <PosActionButton
                 key={tab.id}
-                type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium transition",
-                  active
-                    ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
-                    : "border-[var(--border)] bg-[var(--card-muted)] text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
-                )}
-              >
-                <Icon className="h-4.5 w-4.5" />
-                {tab.label}
-              </button>
+                icon={Icon}
+                active={active}
+                label={tab.label}
+                className={cn(active && "shadow-[var(--shadow-soft)]")}
+              />
             );
           })}
-        </div>
-      </section>
+      </PosActionStrip>
 
       <div className="space-y-6">
         {activeTab === "dashboard" && (
           <DashboardPage
+            initialTab={initialDashboardTab}
             hasActiveShift={hasActiveShift}
             onStartShift={handleStartShift}
             onShiftStateChange={handleShiftStateChange}

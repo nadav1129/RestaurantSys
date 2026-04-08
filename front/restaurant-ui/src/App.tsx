@@ -9,6 +9,7 @@ import LandingPage from "./pages/LandingPage";
 import ChatAssistantPage from "./pages/Service/ChatAssistantPage";
 import ServicePage from "./pages/Service/ServicePage";
 import ManagementPage from "./pages/Management/ManagementPage";
+import OrdersPage from "./pages/OrdersPage";
 import SettingsPage from "./pages/SettingsPage";
 import type { Page } from "./types";
 
@@ -54,6 +55,8 @@ export default function App() {
         return <SettingsPage />;
       case "management":
         return <ManagementPage />;
+      case "orders":
+        return <OrdersPage />;
       default:
         return <EmptyPage />;
     }

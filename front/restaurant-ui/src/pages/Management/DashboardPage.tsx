@@ -17,7 +17,7 @@ import {
 import { cn } from "../../lib/utils";
 import { formatMoney } from "../../utils/money";
 
-type DashboardTab = "alerts" | "tables" | "orders" | "staff";
+export type DashboardTab = "alerts" | "tables" | "orders" | "staff";
 
 type ShiftDto = {
   shiftId: string;
@@ -102,6 +102,7 @@ type DashboardPageProps = {
   hasActiveShift?: boolean;
   onStartShift: () => void;
   onShiftStateChange?: (hasActiveShift: boolean) => void;
+  initialTab?: DashboardTab;
 };
 
 const dashboardTabs: Array<{
@@ -221,8 +222,9 @@ export default function DashboardPage({
   hasActiveShift: _hasActiveShiftFromParent,
   onStartShift,
   onShiftStateChange,
+  initialTab = "alerts",
 }: DashboardPageProps) {
-  const [activeTab, setActiveTab] = useState<DashboardTab>("alerts");
+  const [activeTab, setActiveTab] = useState<DashboardTab>(initialTab);
   const [activeShift, setActiveShift] = useState<ShiftDto | null>(null);
   const [dashboard, setDashboard] = useState<ShiftDashboardDto>(emptyDashboard);
   const [shiftLoading, setShiftLoading] = useState(false);
@@ -230,6 +232,10 @@ export default function DashboardPage({
   const [shiftError, setShiftError] = useState<string | null>(null);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [elapsedText, setElapsedText] = useState("00:00");
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
     void loadActiveShift();

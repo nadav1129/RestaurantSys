@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import type { Page } from "../types";
 import UserLoginPanel from "../pages/Users/UserLoginPanel";
 import { pageMeta, primaryNav } from "./appMeta";
-import { BellIcon, HelpIcon } from "./icons";
+import { HelpIcon, SettingsIcon } from "./icons";
 import { cn } from "../lib/utils";
 
 type Props = { current: Page; onNavigate: (p: Page) => void };
@@ -11,67 +11,75 @@ export default function TopBar({ current, onNavigate }: Props) {
   const [showUserPanel, setShowUserPanel] = useState(false);
   const meta = pageMeta[current];
   const dateLabel = new Intl.DateTimeFormat(undefined, {
-    weekday: "short",
     month: "short",
     day: "numeric",
   }).format(new Date());
-  const PageIcon = meta.icon;
+  const timeLabel = new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date());
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--card)]/80 backdrop-blur-2xl">
-        <div className="flex flex-col gap-4 px-4 lg:px-6">
-          <div className="flex h-[80px] items-center justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent)] text-[var(--accent-foreground)]">
-                <PageIcon className="h-5 w-5" />
+      <header className="sticky top-0 z-30">
+        <div className="rs-pos-topbar px-4 pb-4 pt-3 lg:px-6">
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="min-w-[96px] text-left leading-tight text-white/82">
+              <div className="text-sm font-light">{timeLabel}</div>
+              <div className="mt-1 text-[11px] uppercase tracking-[0.24em] text-white/52">
+                {dateLabel}
               </div>
-              <div className="truncate font-display text-base font-semibold text-[var(--foreground)]">
+            </div>
+
+            <div className="pointer-events-none absolute left-1/2 top-1 min-w-0 -translate-x-1/2 px-2 text-center">
+              <div className="truncate text-lg font-medium tracking-[0.04em] text-white">
                 {meta.title}
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="hidden rounded-full border border-[var(--border)] bg-[var(--card-muted)] px-3 py-1.5 text-xs font-medium text-[var(--muted-foreground)] md:flex">
-                {dateLabel}
-              </div>
+            <div className="ml-auto flex items-center gap-2">
               <button
                 type="button"
-                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--card-muted)] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
-                aria-label="Notifications"
-              >
-                <BellIcon className="h-4.5 w-4.5" />
-              </button>
-              <button
-                type="button"
-                className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--card-muted)] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
-                aria-label="Help"
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-[var(--highlight)] transition hover:bg-white/10 hover:text-white"
+                aria-label="AI Assistant"
+                onClick={() => onNavigate("assistant")}
               >
                 <HelpIcon className="h-4.5 w-4.5" />
               </button>
               <button
                 type="button"
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-white/76 transition hover:bg-white/10 hover:text-white"
+                aria-label="Settings"
+                onClick={() => onNavigate("settings")}
+              >
+                <SettingsIcon className="h-4.5 w-4.5" />
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowUserPanel(true)}
-                className="flex min-w-[116px] items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--card-muted)] px-4 py-3 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--muted)]"
+                className="rounded-xl border border-white/12 bg-white/8 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/14"
               >
                 Staff Access
               </button>
             </div>
           </div>
 
-          <nav className="flex items-center gap-2 overflow-x-auto pb-4 xl:hidden">
+          <nav className="rs-pos-topbar-tabs mt-4">
             {primaryNav.map((t) => (
               <button
                 key={t.key}
                 className={cn(
-                  "whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium transition",
+                  "rs-pos-topbar-tab",
                   current === t.key
-                    ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
-                    : "border-[var(--border)] bg-[var(--card-muted)] text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                    ? "rs-pos-topbar-tab-active"
+                    : ""
                 )}
                 onClick={() => onNavigate(t.key)}
               >
-                {t.label}
+                <t.icon className="h-5.5 w-5.5" />
+                <span className="text-xs font-medium tracking-[0.06em] md:text-sm">
+                  {t.label}
+                </span>
               </button>
             ))}
           </nav>

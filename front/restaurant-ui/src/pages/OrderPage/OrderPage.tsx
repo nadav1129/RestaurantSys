@@ -5,6 +5,7 @@ import OrderMenu from "./OrderMenu";
 import ItemDetails from "./ItemDetails";
 import OrderItems from "./OrderItems";
 import PaymentScreen, { type FinalizedPaymentLine } from "./PaymentScreen";
+import { PosPanel, PosStatusPill } from "../../components/ui/pos";
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -456,11 +457,12 @@ export default function OrderPage({
     const children = node.children ?? [];
 
     return (
-      <div className="rs-surface h-full overflow-hidden">
-        <div className="border-b border-[var(--border)] bg-[var(--card-muted)] px-4 py-3 text-sm font-medium text-[var(--foreground)]">
-          {node.name ?? "Menu"}
-        </div>
-        <div className="p-4">
+      <PosPanel
+        title={node.name ?? "Menu"}
+        description="Category navigation"
+        className="h-full"
+        actions={<PosStatusPill>{children.length} sections</PosStatusPill>}
+      >
           {children.length === 0 ? (
             <div className="text-xs text-[var(--muted-foreground)]">No sub-categories.</div>
           ) : (
@@ -468,7 +470,7 @@ export default function OrderPage({
               {children.map((child) => (
                 <li key={child.id}>
                   <button
-                    className="w-full rounded-2xl border border-transparent px-3 py-2.5 text-left text-[var(--foreground)] transition hover:border-[var(--border)] hover:bg-[var(--card-muted)]"
+                    className="w-full rounded-[0.95rem] border border-transparent px-3 py-2.5 text-left text-[var(--foreground)] transition hover:border-[var(--border)] hover:bg-[var(--card-muted)]"
                     onClick={() => enterNode(child)}
                   >
                     {child.name}
@@ -480,19 +482,18 @@ export default function OrderPage({
 
           {path.length > 1 ? (
             <button
-              className="mt-3 w-full rounded-2xl border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm text-[var(--foreground)] transition hover:bg-[var(--muted)]"
+              className="mt-3 w-full rounded-[0.95rem] border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-sm text-[var(--foreground)] transition hover:bg-[var(--muted)]"
               onClick={goUpOne}
             >
               Up one
             </button>
           ) : null}
-        </div>
-      </div>
+      </PosPanel>
     );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-6 px-4 py-4 lg:px-6">
+    <div className="mx-auto flex w-full max-w-[1760px] flex-col gap-6 px-4 py-4 lg:px-6">
       <OrderInfoCard
         table={table}
         setTable={setTable}

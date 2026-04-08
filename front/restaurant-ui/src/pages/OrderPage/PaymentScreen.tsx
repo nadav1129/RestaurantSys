@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import Button from "../../components/Button";
 import { ReceiptIcon, XIcon } from "../../components/icons";
+import { PosActionStrip, PosMetricCircle, PosPanel, PosStatusPill } from "../../components/ui/pos";
 import { formatMoney } from "../../utils/money";
 
 type PaymentMethod = "cash" | "credit_card" | "company_card";
@@ -245,65 +246,59 @@ export default function PaymentScreen({
   return (
     <>
       <div className="rs-overlay fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 lg:p-6">
-        <div className="rs-modal w-full max-w-6xl overflow-hidden">
-          <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4 lg:px-6">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--muted-foreground)]">
-                Payment
+        <div className="w-full max-w-6xl overflow-hidden rounded-[1.35rem] border border-[var(--border)] bg-[var(--surface-main)] shadow-[var(--shadow-strong)]">
+          <div className="rs-pos-topbar relative px-5 pb-5 pt-4 lg:px-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-wrap gap-4 text-white/84">
+                <HeaderMetric label="Paid" value={`NIS ${formatMoney(0)}`} />
+                <HeaderMetric label="Split" value={`${splitCount} / ${splitCount}`} />
+                <HeaderMetric label="Tip" value={`NIS ${formatMoney(globalTipCents / 100)}`} />
               </div>
-              <div className="mt-1 text-2xl font-semibold text-[var(--foreground)]">
-                NIS {formatMoney(totalAmountCents / 100)}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--card-muted)] text-[var(--muted-foreground)] transition hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
-            >
-              <XIcon className="h-4.5 w-4.5" />
-            </button>
-          </div>
-
-          <div className="border-b border-[var(--border)] bg-[var(--card-muted)] px-5 py-4 lg:px-6">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                  Split
-                </span>
-                {SPLIT_OPTIONS.map((count) => (
-                  <button
-                    key={count}
-                    type="button"
-                    onClick={() => setSplitCount(count)}
-                    className={[
-                      "rounded-xl border px-3 py-2 text-sm font-medium transition",
-                      splitCount === count
-                        ? "border-[var(--accent)] bg-[var(--accent)] text-[var(--accent-foreground)]"
-                        : "border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--muted)]",
-                    ].join(" ")}
-                  >
-                    {count}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] px-4 py-2">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[var(--muted-foreground)]">
-                    Tip
-                  </div>
-                  <div className="mt-1 font-medium text-[var(--foreground)]">
-                    NIS {formatMoney(globalTipCents / 100)}
-                  </div>
-                </div>
-                <Button variant="secondary" onClick={() => setGlobalTipOpen(true)}>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  className="border-white/10 bg-white/8 text-white hover:bg-white/14 hover:text-white"
+                  onClick={() => setGlobalTipOpen(true)}
+                >
                   Add Tip
                 </Button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex h-11 w-11 items-center justify-center rounded-[0.95rem] border border-white/10 bg-white/8 text-white transition hover:bg-white/14"
+                >
+                  <XIcon className="h-4.5 w-4.5" />
+                </button>
               </div>
+            </div>
+
+            <div className="pointer-events-none absolute left-1/2 top-[18px] -translate-x-1/2">
+              <PosMetricCircle label="Total" value={formatMoney(totalAmountCents / 100)} />
             </div>
           </div>
 
-          <div className="grid gap-6 px-5 py-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:px-6 lg:py-6">
+          <div className="px-5 pb-5 pt-20 lg:px-6">
+            <PosActionStrip className="mb-5">
+              {SPLIT_OPTIONS.map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => setSplitCount(count)}
+                  className={[
+                    "rounded-[0.95rem] border px-3 py-2 text-sm font-medium transition",
+                    splitCount === count
+                      ? "border-[color:color-mix(in_srgb,var(--highlight)_70%,white_30%)] bg-[var(--highlight)] text-[var(--accent-foreground)]"
+                      : "border-[var(--border)] bg-white text-[var(--foreground)] hover:bg-[var(--muted)]",
+                  ].join(" ")}
+                >
+                  Split {count}
+                </button>
+              ))}
+              <PosStatusPill>Subtotal NIS {formatMoney(subtotalCents / 100)}</PosStatusPill>
+              <PosStatusPill tone="accent">Tip NIS {formatMoney(globalTipCents / 100)}</PosStatusPill>
+            </PosActionStrip>
+
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
             <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {cardSummaries.map((card) => (
@@ -366,20 +361,8 @@ export default function PaymentScreen({
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-[var(--border)] bg-[var(--card-muted)] p-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--accent)] text-[var(--accent-foreground)]">
-                  <ReceiptIcon className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="font-semibold text-[var(--foreground)]">Summary</div>
-                  <div className="text-sm text-[var(--muted-foreground)]">
-                    {splitCount} payment {splitCount === 1 ? "card" : "cards"}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 space-y-3">
+            <PosPanel title="Summary" description={`${splitCount} payment ${splitCount === 1 ? "card" : "cards"}`} tone="highlight">
+              <div className="space-y-3">
                 <SummaryRow label="Subtotal" value={`NIS ${formatMoney(subtotalCents / 100)}`} />
                 <SummaryRow label="Tip" value={`NIS ${formatMoney(totalTipCents / 100)}`} />
                 <SummaryRow label="Total" value={`NIS ${formatMoney(totalAmountCents / 100)}`} strong />
@@ -393,9 +376,10 @@ export default function PaymentScreen({
                   Close
                 </Button>
               </div>
-            </div>
+            </PosPanel>
           </div>
         </div>
+      </div>
       </div>
 
       {globalTipOpen ? (
@@ -795,6 +779,23 @@ function TipEditor({
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function HeaderMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex min-w-[78px] flex-col items-center justify-center">
+      <span className="text-sm font-light leading-none">{value}</span>
+      <span className="mt-1 text-[10px] uppercase tracking-[0.18em] text-white/48">
+        {label}
+      </span>
     </div>
   );
 }
