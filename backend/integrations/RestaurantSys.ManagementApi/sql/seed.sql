@@ -26,6 +26,7 @@ WHERE m.menu_num = 0
 UPDATE management_settings
 SET
   active_menu_num = COALESCE(active_menu_num, 0),
+  current_guest_count = COALESCE(current_guest_count, 0),
   updated_at = now()
 WHERE id = 1
   AND EXISTS (SELECT 1 FROM menus WHERE menu_num = 0);

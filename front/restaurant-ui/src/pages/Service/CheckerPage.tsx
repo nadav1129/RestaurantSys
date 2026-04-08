@@ -1,23 +1,21 @@
-// File: src/pages/CheckerPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import Button from "../../components/Button";
 import { apiFetch } from "../../api/api";
 import type { CheckerStationSettings, Station } from "../../types";
 
-/* One meal line inside an order */
 type MealLine = {
   id: string;
   name: string;
-  qty: number; // ordered
-  done: number; // prepared portions
-  verified: boolean; // true after checker clicks ✓
+  qty: number;
+  done: number;
+  verified: boolean;
+  cancelled: boolean;
 };
 
-/* An order that came into the kitchen/checker */
 type CheckerOrder = {
   orderId: string;
-  table: string; // table / pickup / delivery etc. (backend returns "table")
-  createdAt: string; // ISO string
+  table: string;
+  createdAt: string;
   meals: MealLine[];
 };
 
@@ -46,15 +44,12 @@ type CheckerState = {
 };
 
 export default function CheckerPage({ station }: { station?: Station }) {
-  /* Single state object to avoid nested setState issues */
   const [checker, setChecker] = useState<CheckerState>({
     main: [],
     queue: [],
   });
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const [colorsEnabled, setColorsEnabled] = useState(true);
   const [printEnabled, setPrintEnabled] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -69,44 +64,39 @@ export default function CheckerPage({ station }: { station?: Station }) {
     [ordersMain, ordersQueue]
   );
 
-  /* Right-side summary: aggregate remaining meals across all orders */
   const remaining = useMemo(() => {
     const map = new Map<string, { id: string; name: string; qty: number }>();
-    for (const o of allOrders) {
-      for (const m of o.meals) {
-        const rem = m.qty - m.done;
+    for (const order of allOrders) {
+      for (const meal of order.meals) {
+        if (meal.cancelled) continue;
+        const rem = meal.qty - meal.done;
         if (rem <= 0) continue;
-        const prev = map.get(m.id);
+
+        const key = meal.name;
+        const prev = map.get(key);
         if (prev) prev.qty += rem;
-        else map.set(m.id, { id: m.id, name: m.name, qty: rem });
+        else map.set(key, { id: key, name: meal.name, qty: rem });
       }
     }
-    return Array.from(map.values()).sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [allOrders]);
 
   const showConfirm = (cfg: ConfirmConfig) => {
     setConfirm(cfg);
   };
 
-  /* + : mark ONE more portion as prepared (if possible) */
-  const addPrepared = (
-    list: "main" | "queue",
-    orderId: string,
-    mealId: string
-  ) => {
+  const addPrepared = (list: "main" | "queue", orderId: string, mealId: string) => {
     setChecker((prev) => ({
       ...prev,
-      [list]: prev[list].map((o) =>
-        o.orderId !== orderId
-          ? o
+      [list]: prev[list].map((order) =>
+        order.orderId !== orderId
+          ? order
           : {
-              ...o,
-              meals: o.meals.map((m) => {
-                if (m.id !== mealId) return m;
-                if (m.done >= m.qty) return m;
-                return { ...m, done: m.done + 1 };
+              ...order,
+              meals: order.meals.map((meal) => {
+                if (meal.id !== mealId || meal.cancelled) return meal;
+                if (meal.done >= meal.qty) return meal;
+                return { ...meal, done: meal.done + 1 };
               }),
             }
       ),
@@ -124,7 +114,7 @@ export default function CheckerPage({ station }: { station?: Station }) {
 
       setChecker({
         main: Array.isArray(data) ? data : [],
-        queue: [], // we don't use queue yet
+        queue: [],
       });
     } catch (e: any) {
       console.error("Failed to load checker orders", e);
@@ -199,32 +189,27 @@ export default function CheckerPage({ station }: { station?: Station }) {
     }
   }
 
-  /* - : revert ONE prepared portion (if any) */
-  const removePrepared = (
-    list: "main" | "queue",
-    orderId: string,
-    mealId: string
-  ) => {
+  const removePrepared = (list: "main" | "queue", orderId: string, mealId: string) => {
     setChecker((prev) => ({
       ...prev,
-      [list]: prev[list].map((o) =>
-        o.orderId !== orderId
-          ? o
+      [list]: prev[list].map((order) =>
+        order.orderId !== orderId
+          ? order
           : {
-              ...o,
-              meals: o.meals.map((m) => {
-                if (m.id !== mealId) return m;
-                if (m.done <= 0) return m;
-                return { ...m, done: m.done - 1 };
+              ...order,
+              meals: order.meals.map((meal) => {
+                if (meal.id !== mealId || meal.cancelled) return meal;
+                if (meal.done <= 0) return meal;
+                return { ...meal, done: meal.done - 1 };
               }),
             }
       ),
     }));
   };
 
-  const markReady = async (orderId: string, productId: string) => {
+  const markReady = async (orderId: string, orderItemId: string) => {
     const res = (await apiFetch(
-      `/api/checker/orders/${orderId}/items/${productId}/ready`,
+      `/api/checker/orders/${orderId}/items/${orderItemId}/ready`,
       { method: "PATCH" }
     )) as { ok?: boolean; affected?: number };
 
@@ -233,17 +218,14 @@ export default function CheckerPage({ station }: { station?: Station }) {
     }
   };
 
-  // Dismiss entire order (after all lines verified)
   const dismissOrder = async (orderId: string) => {
-  const res = (await apiFetch(`/api/checker/orders/${orderId}/dismiss`, {
-    method: "PATCH",
-  })) as { ok?: boolean; affected?: number };
+    const res = (await apiFetch(`/api/checker/orders/${orderId}/dismiss`, {
+      method: "PATCH",
+    })) as { ok?: boolean; affected?: number };
 
-  if (!res?.ok) throw new Error("Failed to dismiss order");
-};
+    if (!res?.ok) throw new Error("Failed to dismiss order");
+  };
 
-
-  /* Core verify: PATCH backend + mark line verified + ensure prepared = ordered */
   const verifyLineForce = async (
     list: "main" | "queue",
     orderId: string,
@@ -255,15 +237,20 @@ export default function CheckerPage({ station }: { station?: Station }) {
 
       setChecker((prev) => ({
         ...prev,
-        [list]: prev[list].map((o) =>
-          o.orderId !== orderId
-            ? o
+        [list]: prev[list].map((order) =>
+          order.orderId !== orderId
+            ? order
             : {
-                ...o,
-                meals: o.meals.map((m) => {
-                  if (m.id !== mealId) return m;
-                  const newDone = m.done < m.qty ? m.qty : m.done;
-                  return { ...m, done: newDone, verified: true };
+                ...order,
+                meals: order.meals.map((meal) => {
+                  if (meal.id !== mealId) return meal;
+                  const newDone = meal.done < meal.qty ? meal.qty : meal.done;
+                  return {
+                    ...meal,
+                    done: newDone,
+                    verified: true,
+                    cancelled: false,
+                  };
                 }),
               }
         ),
@@ -274,22 +261,16 @@ export default function CheckerPage({ station }: { station?: Station }) {
     }
   };
 
-  /* ✓ : verify line; if done < qty, ask confirmation via panel */
-  const verifyLine = (
-    list: "main" | "queue",
-    orderId: string,
-    mealId: string
-  ) => {
+  const verifyLine = (list: "main" | "queue", orderId: string, mealId: string) => {
     const orders = list === "main" ? ordersMain : ordersQueue;
     const order = orders.find((o) => o.orderId === orderId);
     const meal = order?.meals.find((m) => m.id === mealId);
-    if (!meal) return;
+    if (!meal || meal.cancelled) return;
 
     if (meal.done < meal.qty) {
       showConfirm({
         title: "Mark meal as ready?",
-        message:
-          "Prepared is less than ordered. Mark the rest as prepared and verify this item?",
+        message: "Prepared is less than ordered. Mark the rest as prepared and verify this item?",
         confirmLabel: "Yes, mark as prepared",
         cancelLabel: "Cancel",
         onConfirm: () => {
@@ -301,7 +282,6 @@ export default function CheckerPage({ station }: { station?: Station }) {
     }
   };
 
-  /* Move order between main and queue (no duplication, single state) */
   const moveToQueue = (orderId: string) => {
     setChecker((prev) => {
       const idx = prev.main.findIndex((o) => o.orderId === orderId);
@@ -326,32 +306,31 @@ export default function CheckerPage({ station }: { station?: Station }) {
     });
   };
 
-  /* Delete card with confirmation if not all lines are green */
   const deleteOrderForce = async (list: "main" | "queue", orderId: string) => {
-  try {
-    setError(null);
-    await dismissOrder(orderId);
+    try {
+      setError(null);
+      await dismissOrder(orderId);
 
-    setChecker((prev) => ({
-      ...prev,
-      [list]: prev[list].filter((o) => o.orderId !== orderId),
-    }));
-  } catch (e: any) {
-    console.error("Failed to dismiss order", e);
-    setError(e?.message ?? "Failed to delete order");
-  }
-};
-
+      setChecker((prev) => ({
+        ...prev,
+        [list]: prev[list].filter((o) => o.orderId !== orderId),
+      }));
+    } catch (e: any) {
+      console.error("Failed to dismiss order", e);
+      setError(e?.message ?? "Failed to delete order");
+    }
+  };
 
   const deleteOrder = (list: "main" | "queue", order: CheckerOrder) => {
     const allGreen =
-      order.meals.length > 0 && order.meals.every((m) => m.verified);
+      order.meals.length > 0 &&
+      order.meals.every((meal) => meal.verified || meal.cancelled);
 
     if (!allGreen) {
       showConfirm({
         title: "Delete order?",
         message:
-          "Not all meals in this order are verified (green). Are you sure you want to delete this card?",
+          "Not all meals in this order are verified or cancelled. Are you sure you want to delete this card?",
         confirmLabel: "Delete anyway",
         cancelLabel: "Cancel",
         onConfirm: () => void deleteOrderForce(list, order.orderId),
@@ -361,7 +340,6 @@ export default function CheckerPage({ station }: { station?: Station }) {
     }
   };
 
-  /* Drag & drop reordering inside a list */
   const onDragStartCard = (list: "main" | "queue", index: number) => {
     setDragInfo({ list, index });
   };
@@ -392,15 +370,11 @@ export default function CheckerPage({ station }: { station?: Station }) {
   return (
     <>
       <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-4 px-4 py-4 md:grid-cols-[2fr_1fr]">
-        {/* Left side: Queue + Main orders */}
         <div className="space-y-4">
-          {/* Top controls */}
           <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white px-4 py-3">
             <div>
               <div className="text-xs font-medium text-gray-500">Checker</div>
-              <div className="text-sm font-semibold text-gray-900">
-                Orders & Queue
-              </div>
+              <div className="text-sm font-semibold text-gray-900">Orders & Queue</div>
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -422,7 +396,6 @@ export default function CheckerPage({ station }: { station?: Station }) {
                 type="button"
                 variant="ghost"
                 onClick={() => {
-                  // Placeholder for real past orders view
                   console.log("Past orders clicked");
                 }}
               >
@@ -430,13 +403,14 @@ export default function CheckerPage({ station }: { station?: Station }) {
               </Button>
             </div>
           </div>
-          {loading && (
-            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
-              Loading checker orders…
-            </div>
-          )}
 
-          {error && (
+          {loading ? (
+            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
+              Loading checker orders...
+            </div>
+          ) : null}
+
+          {error ? (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
               <div className="mt-2">
@@ -445,16 +419,13 @@ export default function CheckerPage({ station }: { station?: Station }) {
                 </Button>
               </div>
             </div>
-          )}
+          ) : null}
 
-          {/* Queue panel */}
           <section className="rounded-2xl border border-gray-200 bg-white p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <div className="text-xs font-medium text-gray-500">Queue</div>
-                <div className="text-sm font-semibold text-gray-900">
-                  Special tables
-                </div>
+                <div className="text-sm font-semibold text-gray-900">Special tables</div>
                 <div className="text-xs text-gray-500">
                   Pull specific tables here for dynamic attention.
                 </div>
@@ -462,18 +433,18 @@ export default function CheckerPage({ station }: { station?: Station }) {
             </div>
             {ordersQueue.length === 0 ? (
               <div className="text-sm text-gray-400">
-                Queue is empty – use{" "}
-                <span className="font-medium">Move to queue</span> on a table if
-                you want to handle it separately.
+                Queue is empty. Use Move to queue on an order if you want to handle it separately.
               </div>
             ) : (
               <ul className="space-y-3">
-                {ordersQueue.map((o, index) => {
+                {ordersQueue.map((order, index) => {
                   const allGreen =
-                    o.meals.length > 0 && o.meals.every((m) => m.verified);
+                    order.meals.length > 0 &&
+                    order.meals.every((meal) => meal.verified || meal.cancelled);
+
                   return (
                     <li
-                      key={o.orderId}
+                      key={order.orderId}
                       draggable
                       onDragStart={() => onDragStartCard("queue", index)}
                       onDragOver={onDragOverCard}
@@ -486,14 +457,14 @@ export default function CheckerPage({ station }: { station?: Station }) {
                       }
                     >
                       <OrderCardHeader
-                        order={o}
+                        order={order}
                         list="queue"
-                        onMoveBetweenLists={() => moveToMain(o.orderId)}
-                        onDelete={() => deleteOrder("queue", o)}
+                        onMoveBetweenLists={() => moveToMain(order.orderId)}
+                        onDelete={() => deleteOrder("queue", order)}
                       />
                       <MealList
                         list="queue"
-                        order={o}
+                        order={order}
                         colorsEnabled={colorsEnabled}
                         onAddPrepared={addPrepared}
                         onRemovePrepared={removePrepared}
@@ -506,7 +477,6 @@ export default function CheckerPage({ station }: { station?: Station }) {
             )}
           </section>
 
-          {/* Main orders panel */}
           <section className="rounded-2xl border border-gray-200 bg-white p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
@@ -521,17 +491,17 @@ export default function CheckerPage({ station }: { station?: Station }) {
             </div>
 
             {ordersMain.length === 0 ? (
-              <div className="text-sm text-gray-500">
-                No active food orders in main panel.
-              </div>
+              <div className="text-sm text-gray-500">No active food orders in main panel.</div>
             ) : (
               <ul className="space-y-3">
-                {ordersMain.map((o, index) => {
+                {ordersMain.map((order, index) => {
                   const allGreen =
-                    o.meals.length > 0 && o.meals.every((m) => m.verified);
+                    order.meals.length > 0 &&
+                    order.meals.every((meal) => meal.verified || meal.cancelled);
+
                   return (
                     <li
-                      key={o.orderId}
+                      key={order.orderId}
                       draggable
                       onDragStart={() => onDragStartCard("main", index)}
                       onDragOver={onDragOverCard}
@@ -544,14 +514,14 @@ export default function CheckerPage({ station }: { station?: Station }) {
                       }
                     >
                       <OrderCardHeader
-                        order={o}
+                        order={order}
                         list="main"
-                        onMoveBetweenLists={() => moveToQueue(o.orderId)}
-                        onDelete={() => deleteOrder("main", o)}
+                        onMoveBetweenLists={() => moveToQueue(order.orderId)}
+                        onDelete={() => deleteOrder("main", order)}
                       />
                       <MealList
                         list="main"
-                        order={o}
+                        order={order}
                         colorsEnabled={colorsEnabled}
                         onAddPrepared={addPrepared}
                         onRemovePrepared={removePrepared}
@@ -565,16 +535,12 @@ export default function CheckerPage({ station }: { station?: Station }) {
           </section>
         </div>
 
-        {/* Right side: summary */}
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <div className="mb-3">
             <div className="text-xs font-medium text-gray-500">Summary</div>
-            <div className="text-sm font-semibold text-gray-900">
-              Meals to prepare
-            </div>
+            <div className="text-sm font-semibold text-gray-900">Meals to prepare</div>
             <div className="text-xs text-gray-500">
-              Aggregated remaining portions across all open orders (main +
-              queue).
+              Aggregated remaining portions across all open orders (main + queue).
             </div>
           </div>
 
@@ -582,13 +548,13 @@ export default function CheckerPage({ station }: { station?: Station }) {
             <div className="text-sm text-gray-400">All meals prepared.</div>
           ) : (
             <ul className="space-y-2">
-              {remaining.map((m) => (
+              {remaining.map((meal) => (
                 <li
-                  key={m.id}
+                  key={meal.id}
                   className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm"
                 >
-                  <span>{m.name}</span>
-                  <span className="font-semibold">× {m.qty}</span>
+                  <span>{meal.name}</span>
+                  <span className="font-semibold">x {meal.qty}</span>
                 </li>
               ))}
             </ul>
@@ -596,15 +562,11 @@ export default function CheckerPage({ station }: { station?: Station }) {
         </div>
       </div>
 
-      {/* Small in-app confirm panel (no browser UI) */}
-      {confirm && (
-        <ConfirmPanel config={confirm} onCancel={() => setConfirm(null)} />
-      )}
+      {confirm ? <ConfirmPanel config={confirm} onCancel={() => setConfirm(null)} /> : null}
     </>
   );
 }
 
-/* Header for each order card (table) */
 function OrderCardHeader({
   order,
   list,
@@ -620,10 +582,7 @@ function OrderCardHeader({
     <div className="mb-2 flex items-center justify-between">
       <div>
         <div className="font-semibold">
-          {order.table} ·{" "}
-          <span className="text-xs font-normal text-gray-500">
-            {fmtTime(order.createdAt)}
-          </span>
+          {order.table} - <span className="text-xs font-normal text-gray-500">{fmtTime(order.createdAt)}</span>
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -638,7 +597,6 @@ function OrderCardHeader({
   );
 }
 
-/* Meal lines for an order */
 function MealList({
   list,
   order,
@@ -650,81 +608,85 @@ function MealList({
   list: "main" | "queue";
   order: CheckerOrder;
   colorsEnabled: boolean;
-  onAddPrepared: (
-    list: "main" | "queue",
-    orderId: string,
-    mealId: string
-  ) => void;
-  onRemovePrepared: (
-    list: "main" | "queue",
-    orderId: string,
-    mealId: string
-  ) => void;
-  onVerifyLine: (
-    list: "main" | "queue",
-    orderId: string,
-    mealId: string
-  ) => void;
+  onAddPrepared: (list: "main" | "queue", orderId: string, mealId: string) => void;
+  onRemovePrepared: (list: "main" | "queue", orderId: string, mealId: string) => void;
+  onVerifyLine: (list: "main" | "queue", orderId: string, mealId: string) => void;
 }) {
   return (
     <ul className="space-y-2">
-      {order.meals.map((m) => {
-        const rem = m.qty - m.done;
+      {order.meals.map((meal) => {
+        const rem = meal.cancelled ? 0 : meal.qty - meal.done;
         const allDone = rem <= 0;
 
         let colorClass = "bg-white";
         if (colorsEnabled) {
-          if (m.verified) {
+          if (meal.cancelled) {
+            colorClass = "bg-red-50";
+          } else if (meal.verified) {
             colorClass = "bg-green-50";
-          } else if (m.done > 0 && m.done < m.qty) {
+          } else if (meal.done > 0 && meal.done < meal.qty) {
             colorClass = "bg-yellow-50";
-          } else if (m.done === m.qty && m.qty > 0) {
+          } else if (meal.done === meal.qty && meal.qty > 0) {
             colorClass = "bg-blue-50";
           }
         }
 
         return (
           <li
-            key={m.id + order.orderId}
+            key={meal.id + order.orderId}
             className={
               "flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 " +
               colorClass
             }
           >
             <div>
-              <div className="font-medium">{m.name}</div>
+              <div
+                className={[
+                  "font-medium",
+                  meal.cancelled ? "text-red-700 line-through" : "",
+                ].join(" ")}
+              >
+                {meal.name}
+              </div>
               <div className="text-xs text-gray-500">
-                Ordered: {m.qty} · Prepared: {m.done} · Remaining: {rem}
+                {meal.cancelled
+                  ? `Cancelled - Ordered: ${meal.qty}`
+                  : `Ordered: ${meal.qty} - Prepared: ${meal.done} - Remaining: ${rem}`}
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {/* - button: revert prepared */}
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => onRemovePrepared(list, order.orderId, m.id)}
-                disabled={m.done === 0}
-              >
-                -
-              </Button>
+              {meal.cancelled ? (
+                <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
+                  Cancelled
+                </span>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => onRemovePrepared(list, order.orderId, meal.id)}
+                    disabled={meal.done === 0}
+                  >
+                    -
+                  </Button>
 
-              {/* + button: adds prepared, cannot click if prepared == ordered */}
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => onAddPrepared(list, order.orderId, m.id)}
-                disabled={allDone}
-              >
-                +
-              </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => onAddPrepared(list, order.orderId, meal.id)}
+                    disabled={allDone}
+                  >
+                    +
+                  </Button>
 
-              {/* ✓ button: verify (with confirmation if done < qty) */}
-              <Button
-                type="button"
-                onClick={() => onVerifyLine(list, order.orderId, m.id)}
-              >
-                ✓
-              </Button>
+                  <Button
+                    type="button"
+                    onClick={() => onVerifyLine(list, order.orderId, meal.id)}
+                  >
+                    Ready
+                  </Button>
+                </>
+              )}
             </div>
           </li>
         );
@@ -733,7 +695,6 @@ function MealList({
   );
 }
 
-/* Reusable inline confirmation panel */
 function ConfirmPanel({
   config,
   onCancel,
@@ -748,13 +709,12 @@ function ConfirmPanel({
     cancelLabel = "Cancel",
     onConfirm,
   } = config;
+
   return (
     <div className="fixed inset-x-0 bottom-4 flex justify-center pointer-events-none">
       <div className="pointer-events-auto mx-4 max-w-md rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
         <div className="text-sm font-semibold text-gray-900">{title}</div>
-        <div className="mt-1 text-xs text-gray-600 whitespace-pre-line">
-          {message}
-        </div>
+        <div className="mt-1 whitespace-pre-line text-xs text-gray-600">{message}</div>
         <div className="mt-3 flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onCancel}>
             {cancelLabel}

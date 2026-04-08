@@ -13,7 +13,7 @@ public static class SettingsEndpoints
         app.MapGet("/api/settings", async (NpgsqlDataSource db) =>
         {
             const string getSql = @"
-        select active_menu_num, global_discount_pct
+        select active_menu_num, global_discount_pct, current_guest_count
         from public.management_settings
         where id = 1;
     ";
@@ -25,7 +25,8 @@ public static class SettingsEndpoints
                 return Results.Json(new ManagementSettingsDto
                 {
                     ActiveMenuNum = r.IsDBNull(0) ? (int?)null : r.GetInt32(0),
-                    GlobalDiscountPct = r.GetDecimal(1)
+                    GlobalDiscountPct = r.GetDecimal(1),
+                    CurrentGuestCount = r.GetInt32(2)
                 });
             }
 
@@ -36,7 +37,8 @@ public static class SettingsEndpoints
             return Results.Json(new ManagementSettingsDto
             {
                 ActiveMenuNum = null,
-                GlobalDiscountPct = 0m
+                GlobalDiscountPct = 0m,
+                CurrentGuestCount = 0
             });
         });
 
@@ -48,6 +50,9 @@ public static class SettingsEndpoints
             // Validate discount if provided
             if (payload.GlobalDiscountPct is decimal d && (d < 0 || d > 100))
                 return Results.BadRequest(new { error = "globalDiscountPct must be between 0 and 100." });
+
+            if (payload.CurrentGuestCount is int guestCount && guestCount < 0)
+                return Results.BadRequest(new { error = "currentGuestCount must be zero or greater." });
 
             // If ActiveMenuNum provided, ensure the menu exists
             if (payload.ActiveMenuNum is int m && m > 0)
@@ -71,6 +76,8 @@ public static class SettingsEndpoints
                 setParts.Add("active_menu_num = @active");
             if (payload.GlobalDiscountPct is decimal)
                 setParts.Add("global_discount_pct = @disc");
+            if (payload.CurrentGuestCount is int)
+                setParts.Add("current_guest_count = @guest_count");
 
             if (setParts.Count == 0)
                 return Results.BadRequest(new { error = "Nothing to update." });
@@ -80,7 +87,7 @@ public static class SettingsEndpoints
            set {string.Join(", ", setParts)},
                updated_at = now()
          where id = 1
-     returning active_menu_num, global_discount_pct;
+     returning active_menu_num, global_discount_pct, current_guest_count;
     ";
 
             await using var cmd = db.CreateCommand(sql);
@@ -88,6 +95,8 @@ public static class SettingsEndpoints
                 cmd.Parameters.AddWithValue("@active", NpgsqlTypes.NpgsqlDbType.Integer, am);
             if (payload.GlobalDiscountPct is decimal gd)
                 cmd.Parameters.AddWithValue("@disc", NpgsqlTypes.NpgsqlDbType.Numeric, gd);
+            if (payload.CurrentGuestCount is int gc)
+                cmd.Parameters.AddWithValue("@guest_count", NpgsqlTypes.NpgsqlDbType.Integer, gc);
 
             await using var r = await cmd.ExecuteReaderAsync();
             await r.ReadAsync();
@@ -95,7 +104,8 @@ public static class SettingsEndpoints
             var dto = new ManagementSettingsDto
             {
                 ActiveMenuNum = r.IsDBNull(0) ? (int?)null : r.GetInt32(0),
-                GlobalDiscountPct = r.GetDecimal(1)
+                GlobalDiscountPct = r.GetDecimal(1),
+                CurrentGuestCount = r.GetInt32(2)
             };
             return Results.Json(dto);
         });

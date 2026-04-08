@@ -91,8 +91,13 @@ create table if not exists public.management_settings (
   active_menu_num        integer references public.menus(menu_num) on delete set null,
   global_discount_pct    numeric(5,2) not null default 0
     check (global_discount_pct >= 0 and global_discount_pct <= 100),
+  current_guest_count    integer not null default 0
+    check (current_guest_count >= 0),
   updated_at             timestamptz not null default now()
 );
+
+alter table if exists public.management_settings
+  add column if not exists current_guest_count integer not null default 0;
 
 /* Seed the single row */
 insert into public.management_settings (id)
@@ -424,6 +429,11 @@ CREATE TABLE IF NOT EXISTS order_items (
   item_status text NOT NULL DEFAULT 'pending'
               CHECK (item_status IN ('pending','in_progress','ready','served','cancelled')),
 
+  cancel_request_status text NOT NULL DEFAULT 'none'
+              CHECK (cancel_request_status IN ('none','requested','rejected','approved')),
+  cancel_requested_at timestamptz,
+  cancel_decided_at timestamptz,
+
   -- Snapshot of price in cents
   price_cents  int NOT NULL,
 
@@ -435,6 +445,48 @@ CREATE TABLE IF NOT EXISTS order_items (
 CREATE INDEX IF NOT EXISTS ix_order_items_order   ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS ix_order_items_product ON order_items(product_id);
 CREATE INDEX IF NOT EXISTS ix_order_items_worker  ON order_items(entered_by_worker_id);
+CREATE INDEX IF NOT EXISTS ix_order_items_cancel_request_status ON order_items(cancel_request_status);
+
+alter table if exists public.order_items
+  add column if not exists cancel_request_status text not null default 'none';
+
+alter table if exists public.order_items
+  add column if not exists cancel_requested_at timestamptz;
+
+alter table if exists public.order_items
+  add column if not exists cancel_decided_at timestamptz;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'order_items_cancel_request_status_check'
+  ) then
+    alter table public.order_items
+      add constraint order_items_cancel_request_status_check
+      check (cancel_request_status in ('none','requested','rejected','approved'));
+  end if;
+end $$;
+
+create table if not exists order_payments (
+  payment_id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references orders(order_id) on delete cascade,
+  split_index int not null check (split_index >= 0),
+  method text not null check (method in ('cash', 'credit_card', 'company_card')),
+  base_amount_cents int not null check (base_amount_cents >= 0),
+  tip_cents int not null default 0 check (tip_cents >= 0),
+  total_amount_cents int not null check (total_amount_cents >= 0),
+  received_cents int,
+  change_cents int,
+  card_entry_mode text check (card_entry_mode is null or card_entry_mode in ('manual', 'scanner')),
+  acquirer text,
+  reference text,
+  created_at timestamptz not null default now(),
+  unique (order_id, split_index)
+);
+
+create index if not exists ix_order_payments_order on order_payments(order_id);
 
 create table if not exists webhook_receipts (
     message_id   text primary key,

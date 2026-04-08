@@ -152,6 +152,50 @@
     box-shadow: 0 0 0 4px var(--ring);
   }
 
+  .rs-range {
+    width: 100%;
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+  }
+
+  .rs-range::-webkit-slider-runnable-track {
+    height: 0.55rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 55%, var(--card-muted));
+    border: 1px solid var(--border);
+  }
+
+  .rs-range::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    margin-top: -0.35rem;
+    height: 1.2rem;
+    width: 1.2rem;
+    border-radius: 999px;
+    border: 2px solid var(--primary-foreground);
+    background: var(--primary);
+    box-shadow: 0 4px 14px rgba(36, 88, 211, 0.28);
+    cursor: pointer;
+  }
+
+  .rs-range::-moz-range-track {
+    height: 0.55rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 55%, var(--card-muted));
+    border: 1px solid var(--border);
+  }
+
+  .rs-range::-moz-range-thumb {
+    height: 1.2rem;
+    width: 1.2rem;
+    border-radius: 999px;
+    border: 2px solid var(--primary-foreground);
+    background: var(--primary);
+    box-shadow: 0 4px 14px rgba(36, 88, 211, 0.28);
+    cursor: pointer;
+  }
+
   .rs-action-strip {
     display: flex;
     flex-wrap: wrap;

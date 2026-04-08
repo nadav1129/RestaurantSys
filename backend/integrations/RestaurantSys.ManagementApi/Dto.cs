@@ -139,12 +139,160 @@ namespace RestaurantSys.Api
     {
         public int? ActiveMenuNum { get; set; }
         public decimal GlobalDiscountPct { get; set; }
+        public int CurrentGuestCount { get; set; }
     }
 
     public sealed class UpdateManagementSettingsRequest
     {
         public int? ActiveMenuNum { get; set; }          /* null clears selection */
         public decimal? GlobalDiscountPct { get; set; }   /* optional partial update */
+        public int? CurrentGuestCount { get; set; }
+    }
+
+    public sealed class ShiftDashboardDto
+    {
+        public DashboardSummaryDto Summary { get; set; } = new();
+        public List<DashboardTrendPointDto> RevenueTimeline { get; set; } = new();
+        public List<DashboardTableDto> Tables { get; set; } = new();
+        public List<DashboardQueueDto> Queues { get; set; } = new();
+        public List<DashboardStaffDto> Staff { get; set; } = new();
+    }
+
+    public sealed class DashboardSummaryDto
+    {
+        public int CurrentGuestCount { get; set; }
+        public int OpenTablesCount { get; set; }
+        public int OpenOrdersCount { get; set; }
+        public int TotalIncomeCents { get; set; }
+        public int TotalTipsCents { get; set; }
+        public int CancelRequestsCount { get; set; }
+        public int ActiveStaffCount { get; set; }
+        public int PendingItemsCount { get; set; }
+        public int ReadyItemsCount { get; set; }
+    }
+
+    public sealed class DashboardTrendPointDto
+    {
+        public string Label { get; set; } = string.Empty;
+        public int OrdersCount { get; set; }
+        public int RevenueCents { get; set; }
+    }
+
+    public sealed class DashboardTableDto
+    {
+        public Guid OrderId { get; set; }
+        public Guid TableId { get; set; }
+        public int TableNumber { get; set; }
+        public string GuestLabel { get; set; } = string.Empty;
+        public int? DinersCount { get; set; }
+        public DateTime OpenedAt { get; set; }
+        public int MinutesOpen { get; set; }
+        public int CurrentTotalCents { get; set; }
+        public string PaymentStatus { get; set; } = string.Empty;
+        public string Source { get; set; } = string.Empty;
+    }
+
+    public sealed class DashboardQueueDto
+    {
+        public string QueueId { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public string StationType { get; set; } = string.Empty;
+        public int OpenOrders { get; set; }
+        public int PendingItems { get; set; }
+        public int ReadyItems { get; set; }
+        public int AverageAgeMinutes { get; set; }
+    }
+
+    public sealed class DashboardStaffDto
+    {
+        public Guid ShiftWorkerId { get; set; }
+        public Guid WorkerId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Position { get; set; } = string.Empty;
+        public string? StationName { get; set; }
+        public string DeviceType { get; set; } = string.Empty;
+        public DateTime StartedAt { get; set; }
+        public int MinutesOnShift { get; set; }
+    }
+
+    public sealed class StrategicAnalyticsDto
+    {
+        public int SelectedRangeDays { get; set; }
+        public DateTime GeneratedAt { get; set; }
+        public int RevenueTodayCents { get; set; }
+        public int RevenueThisWeekCents { get; set; }
+        public int RevenueLastWeekCents { get; set; }
+        public int RevenueThisMonthCents { get; set; }
+        public int RevenueLastMonthCents { get; set; }
+        public decimal? WeekOverWeekChangePercent { get; set; }
+        public decimal? MonthOverMonthChangePercent { get; set; }
+        public int RevenueInSelectedRangeCents { get; set; }
+        public int AverageDailyRevenueCents { get; set; }
+        public int OrderCountInSelectedRange { get; set; }
+        public int AverageOrderValueCents { get; set; }
+        public List<RevenueSeriesPointDto> DailyRevenueSeries { get; set; } = new();
+        public List<RevenueSeriesPointDto> WeeklyRevenueSeries { get; set; } = new();
+        public List<RevenueSeriesPointDto> MonthlyRevenueSeries { get; set; } = new();
+    }
+
+    public sealed class RevenueSeriesPointDto
+    {
+        public string Key { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public int RevenueCents { get; set; }
+        public int OrderCount { get; set; }
+    }
+
+    public sealed class ActiveOrderItemDto
+    {
+        public Guid OrderItemId { get; set; }
+        public Guid ProductId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public int Qty { get; set; }
+        public decimal UnitPrice { get; set; }
+        public string ItemStatus { get; set; } = string.Empty;
+        public string CancelRequestStatus { get; set; } = "none";
+    }
+
+    public sealed class ActiveOrderDto
+    {
+        public Guid? OrderId { get; set; }
+        public List<ActiveOrderItemDto> Items { get; set; } = new();
+    }
+
+    public sealed class OrderCancelRequestDto
+    {
+        public Guid OrderItemId { get; set; }
+        public Guid OrderId { get; set; }
+        public Guid ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+        public string SourceLabel { get; set; } = string.Empty;
+        public DateTimeOffset RequestedAt { get; set; }
+    }
+
+    public sealed class DecideOrderCancelRequest
+    {
+        public bool Approved { get; set; }
+    }
+
+    public sealed class SaveOrderPaymentLineRequest
+    {
+        public int SplitIndex { get; set; }
+        public string Method { get; set; } = string.Empty;
+        public int BaseAmountCents { get; set; }
+        public int TipCents { get; set; }
+        public int TotalAmountCents { get; set; }
+        public int? ReceivedCents { get; set; }
+        public int? ChangeCents { get; set; }
+        public string? CardEntryMode { get; set; }
+        public string? Acquirer { get; set; }
+        public string? Reference { get; set; }
+    }
+
+    public sealed class SaveOrderPaymentsRequest
+    {
+        public List<SaveOrderPaymentLineRequest> Payments { get; set; } = new();
     }
 
     /* ============ STATIONS ============ */
@@ -526,6 +674,7 @@ namespace RestaurantSys.Api
         public int Qty { get; set; }
         public int Done { get; set; }
         public bool Verified { get; set; }
+        public bool Cancelled { get; set; }
     }
 
     public sealed class CheckerOrderDto

@@ -137,6 +137,7 @@ app.MapPricesEndpoints();
 
 // Menagement
 app.MapSettingsEndpoints();
+app.MapAnalyticsEndpoints();
 app.MapRevenueCentersEndpoints();
 app.MapListStationsEndpoints();
 app.MapTableStationsEndpoints();
@@ -148,7 +149,8 @@ app.MapCheckerEndpoints();
 
 // Shifts
 app.MapShiftEndpoints();
-app.MapShiftWorkersEndpoints(); 
+app.MapShiftWorkersEndpoints();
+app.MapShiftDashboardEndpoints();
 
 // Orders
 app.MapOrderEndpoints();

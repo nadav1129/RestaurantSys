@@ -41,6 +41,10 @@ export default function ManagementPage() {
     setHasActiveShift(true);
   };
 
+  const handleShiftStateChange = (nextHasActiveShift: boolean) => {
+    setHasActiveShift(nextHasActiveShift);
+  };
+
   return (
     <PageContainer className="space-y-6">
       <PageHeader
@@ -83,6 +87,7 @@ export default function ManagementPage() {
           <DashboardPage
             hasActiveShift={hasActiveShift}
             onStartShift={handleStartShift}
+            onShiftStateChange={handleShiftStateChange}
           />
         )}
 

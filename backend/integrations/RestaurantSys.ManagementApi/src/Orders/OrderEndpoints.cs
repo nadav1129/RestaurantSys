@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Npgsql;
+using RestaurantSys.Api;
 
 namespace RestaurantSys.Api.Endpoints;
 
@@ -684,6 +685,102 @@ public static class OrderEndpoints
             }
         });
 
+        app.MapPut("/api/orders/{orderId:guid}/payments", async (Guid orderId, SaveOrderPaymentsRequest payload, NpgsqlDataSource db) =>
+        {
+            try
+            {
+                if (payload is null)
+                    return Results.BadRequest(new { error = "Invalid JSON." });
+
+                var payments = payload.Payments ?? new List<SaveOrderPaymentLineRequest>();
+
+                foreach (var payment in payments)
+                {
+                    if (payment.SplitIndex < 0)
+                        return Results.BadRequest(new { error = "splitIndex must be zero or greater." });
+
+                    if (string.IsNullOrWhiteSpace(payment.Method) ||
+                        !(payment.Method == "cash" || payment.Method == "credit_card" || payment.Method == "company_card"))
+                    {
+                        return Results.BadRequest(new { error = "Invalid payment method." });
+                    }
+
+                    if (payment.BaseAmountCents < 0 || payment.TipCents < 0 || payment.TotalAmountCents < 0)
+                        return Results.BadRequest(new { error = "Payment amounts must be zero or greater." });
+
+                    if (payment.ReceivedCents is int received && received < 0)
+                        return Results.BadRequest(new { error = "receivedCents must be zero or greater." });
+
+                    if (payment.ChangeCents is int change && change < 0)
+                        return Results.BadRequest(new { error = "changeCents must be zero or greater." });
+
+                    if (!string.IsNullOrWhiteSpace(payment.CardEntryMode) &&
+                        payment.CardEntryMode is not ("manual" or "scanner"))
+                    {
+                        return Results.BadRequest(new { error = "cardEntryMode must be manual, scanner, or null." });
+                    }
+                }
+
+                await using var conn = await db.OpenConnectionAsync();
+                await using var tx = await conn.BeginTransactionAsync();
+
+                const string existsSql = "select 1 from orders where order_id = @order_id limit 1;";
+                await using (var existsCmd = new NpgsqlCommand(existsSql, conn, tx))
+                {
+                    existsCmd.Parameters.AddWithValue("order_id", orderId);
+                    if (await existsCmd.ExecuteScalarAsync() is null)
+                    {
+                        await tx.RollbackAsync();
+                        return Results.NotFound(new { error = "Order not found." });
+                    }
+                }
+
+                const string deleteSql = "delete from order_payments where order_id = @order_id;";
+                await using (var deleteCmd = new NpgsqlCommand(deleteSql, conn, tx))
+                {
+                    deleteCmd.Parameters.AddWithValue("order_id", orderId);
+                    await deleteCmd.ExecuteNonQueryAsync();
+                }
+
+                const string insertSql = @"
+insert into order_payments
+  (order_id, split_index, method, base_amount_cents, tip_cents, total_amount_cents,
+   received_cents, change_cents, card_entry_mode, acquirer, reference)
+values
+  (@order_id, @split_index, @method, @base_amount_cents, @tip_cents, @total_amount_cents,
+   @received_cents, @change_cents, @card_entry_mode, @acquirer, @reference);";
+
+                foreach (var payment in payments)
+                {
+                    await using var insertCmd = new NpgsqlCommand(insertSql, conn, tx);
+                    insertCmd.Parameters.AddWithValue("order_id", orderId);
+                    insertCmd.Parameters.AddWithValue("split_index", payment.SplitIndex);
+                    insertCmd.Parameters.AddWithValue("method", payment.Method);
+                    insertCmd.Parameters.AddWithValue("base_amount_cents", payment.BaseAmountCents);
+                    insertCmd.Parameters.AddWithValue("tip_cents", payment.TipCents);
+                    insertCmd.Parameters.AddWithValue("total_amount_cents", payment.TotalAmountCents);
+                    insertCmd.Parameters.AddWithValue("received_cents", (object?)payment.ReceivedCents ?? DBNull.Value);
+                    insertCmd.Parameters.AddWithValue("change_cents", (object?)payment.ChangeCents ?? DBNull.Value);
+                    insertCmd.Parameters.AddWithValue("card_entry_mode", (object?)payment.CardEntryMode ?? DBNull.Value);
+                    insertCmd.Parameters.AddWithValue("acquirer", (object?)payment.Acquirer ?? DBNull.Value);
+                    insertCmd.Parameters.AddWithValue("reference", (object?)payment.Reference ?? DBNull.Value);
+                    await insertCmd.ExecuteNonQueryAsync();
+                }
+
+                await tx.CommitAsync();
+
+                return Results.Json(
+                    new { ok = true, count = payments.Count },
+                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Error in PUT /api/orders/{orderId}/payments:\n" + ex);
+                return Results.Problem("PUT /api/orders/{orderId}/payments failed", statusCode: 500);
+            }
+        });
+
         // GET /api/orders/active?shiftId=<guid>&tableId=<guid?>   (tableId is optional)
         app.MapGet("/api/orders/active", async (HttpRequest req, NpgsqlDataSource db) =>
         {
@@ -757,10 +854,7 @@ public static class OrderEndpoints
                     }
                     else
                     {
-                        return Results.Json(
-                            new { orderId = (Guid?)null, items = Array.Empty<object>() },
-                            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
-                        );
+                        return Results.Json(new ActiveOrderDto(), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
                     }
                 }
                 else
@@ -783,42 +877,45 @@ public static class OrderEndpoints
 
                 if (orderId is null)
                 {
-                    return Results.Json(
-                        new { orderId = (Guid?)null, items = Array.Empty<object>() },
-                        new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
-                    );
+                    return Results.Json(new ActiveOrderDto(), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
                 }
                 const string ITEMS_SQL = @"
     select
+      oi.order_item_id,
       oi.product_id,
       coalesce(p.name, '[missing product]') as name,
       oi.quantity,
-      oi.price_cents
+      oi.price_cents,
+      oi.item_status,
+      oi.cancel_request_status
     from order_items oi
     left join products p on p.product_id = oi.product_id
     where oi.order_id = @order_id
     order by oi.created_at;
 ";
 
-                var items = new List<object>();
+                var items = new List<ActiveOrderItemDto>();
                 await using (var itemsCmd = new NpgsqlCommand(ITEMS_SQL, conn))
                 {
                     itemsCmd.Parameters.AddWithValue("order_id", orderId.Value);
                     await using var r = await itemsCmd.ExecuteReaderAsync();
                     while (await r.ReadAsync())
                     {
-                        items.Add(new
+                        items.Add(new ActiveOrderItemDto
                         {
-                            productId = r.GetGuid(0),
-                            name = r.GetString(1),
-                            qty = r.GetInt32(2),
-                            unitPrice = r.GetInt32(3) / 100m,
+                            OrderItemId = r.GetGuid(0),
+                            ProductId = r.GetGuid(1),
+                            Name = r.GetString(2),
+                            Qty = r.GetInt32(3),
+                            UnitPrice = r.GetInt32(4) / 100m,
+                            ItemStatus = r.GetString(5),
+                            CancelRequestStatus = r.IsDBNull(6) ? "none" : r.GetString(6)
                         });
                     }
                 }
 
                 return Results.Json(
-                    new { orderId, items },
+                    new ActiveOrderDto { OrderId = orderId, Items = items },
                     new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
                 );
             }
@@ -826,6 +923,127 @@ public static class OrderEndpoints
             {
                 Console.Error.WriteLine("Error in GET /api/orders/active:\n" + ex);
                 return Results.Problem("GET /api/orders/active failed", statusCode: 500);
+            }
+        });
+
+        app.MapPost("/api/orders/items/{orderItemId:guid}/cancel-request", async (Guid orderItemId, NpgsqlDataSource db) =>
+        {
+            try
+            {
+                const string sql = @"
+update order_items
+   set cancel_request_status = 'requested',
+       cancel_requested_at = now(),
+       cancel_decided_at = null
+ where order_item_id = @order_item_id
+   and item_status <> 'cancelled'
+   and cancel_request_status in ('none', 'rejected')
+returning order_item_id;";
+
+                await using var cmd = db.CreateCommand(sql);
+                cmd.Parameters.AddWithValue("order_item_id", orderItemId);
+
+                var updated = await cmd.ExecuteScalarAsync();
+                if (updated is null)
+                {
+                    return Results.BadRequest(new { error = "Item cannot request cancellation." });
+                }
+
+                return Results.Json(new { ok = true, orderItemId }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Error in POST /api/orders/items/{orderItemId}/cancel-request:\n" + ex);
+                return Results.Problem("Failed to request item cancellation.", statusCode: 500);
+            }
+        });
+
+        app.MapGet("/api/shifts/{shiftId:guid}/cancel-requests", async (Guid shiftId, NpgsqlDataSource db) =>
+        {
+            try
+            {
+                const string sql = @"
+select
+  oi.order_item_id,
+  o.order_id,
+  oi.product_id,
+  coalesce(p.name, '[missing product]') as product_name,
+  oi.quantity,
+  case
+    when o.guest_name is not null and length(btrim(o.guest_name)) > 0 then o.guest_name
+    when t.table_number is not null then 'Table ' || t.table_number::text
+    else 'Quick'
+  end as source_label,
+  oi.cancel_requested_at
+from order_items oi
+join orders o on o.order_id = oi.order_id
+left join tables t on t.table_id = o.table_id
+left join products p on p.product_id = oi.product_id
+where o.shift_id = @shift_id
+  and o.status = 'open'
+  and oi.cancel_request_status = 'requested'
+order by oi.cancel_requested_at, oi.created_at;";
+
+                var rows = new List<OrderCancelRequestDto>();
+                await using var cmd = db.CreateCommand(sql);
+                cmd.Parameters.AddWithValue("shift_id", shiftId);
+
+                await using var reader = await cmd.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    rows.Add(new OrderCancelRequestDto
+                    {
+                        OrderItemId = reader.GetGuid(0),
+                        OrderId = reader.GetGuid(1),
+                        ProductId = reader.GetGuid(2),
+                        ProductName = reader.GetString(3),
+                        Quantity = reader.GetInt32(4),
+                        SourceLabel = reader.GetString(5),
+                        RequestedAt = reader.GetFieldValue<DateTimeOffset>(6)
+                    });
+                }
+
+                return Results.Json(rows, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Error in GET /api/shifts/{shiftId}/cancel-requests:\n" + ex);
+                return Results.Problem("Failed to load cancel requests.", statusCode: 500);
+            }
+        });
+
+        app.MapPatch("/api/orders/items/{orderItemId:guid}/cancel-request", async (Guid orderItemId, DecideOrderCancelRequest payload, NpgsqlDataSource db) =>
+        {
+            try
+            {
+                const string sql = @"
+update order_items
+   set cancel_request_status = case when @approved then 'approved' else 'rejected' end,
+       cancel_decided_at = now(),
+       item_status = case when @approved then 'cancelled' else item_status end
+ where order_item_id = @order_item_id
+   and cancel_request_status = 'requested'
+returning order_item_id;";
+
+                await using var cmd = db.CreateCommand(sql);
+                cmd.Parameters.AddWithValue("order_item_id", orderItemId);
+                cmd.Parameters.AddWithValue("approved", payload.Approved);
+
+                var updated = await cmd.ExecuteScalarAsync();
+                if (updated is null)
+                {
+                    return Results.NotFound(new { error = "Cancel request not found." });
+                }
+
+                return Results.Json(
+                    new { ok = true, orderItemId, approved = payload.Approved },
+                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("Error in PATCH /api/orders/items/{orderItemId}/cancel-request:\n" + ex);
+                return Results.Problem("Failed to decide cancel request.", statusCode: 500);
             }
         });
 

@@ -216,43 +216,31 @@ public static class CheckerEndpoints
                     stationId = parsedStationId;
                 }
 
-                const string sql = @"
-with x as (
-  select
-    o.order_id,
-    o.opened_at,
-    case
-      when o.guest_name is not null and length(btrim(o.guest_name)) > 0
-        then o.guest_name
-      when t.table_number is not null
-        then 'Table ' || t.table_number::text
-      else
-        'Quick'
-    end as source_label,
-    oi.product_id,
-    coalesce(p.name, '[missing product]') as product_name,
-    oi.quantity,
-    oi.item_status
-  from orders o
-  left join tables t on t.table_id = o.table_id
-  join order_items oi on oi.order_id = o.order_id
-  left join products p on p.product_id = oi.product_id
-  where o.status = 'open'
-    and (@station_id is null or o.checker_station_id = @station_id or o.checker_station_id is null)
-)
+const string sql = @"
 select
-  order_id,
-  opened_at,
-  source_label,
-  product_id,
-  product_name,
-  sum(quantity)::int as qty,
-  sum(case when item_status = 'ready' then quantity else 0 end)::int as done,
-  coalesce(bool_and(item_status = 'ready'), false) as verified
-from x
-group by
-  order_id, opened_at, source_label, product_id, product_name
-order by opened_at;
+  o.order_id,
+  o.opened_at,
+  case
+    when o.guest_name is not null and length(btrim(o.guest_name)) > 0
+      then o.guest_name
+    when t.table_number is not null
+      then 'Table ' || t.table_number::text
+    else
+      'Quick'
+  end as source_label,
+  oi.order_item_id,
+  coalesce(p.name, '[missing product]') as product_name,
+  oi.quantity,
+  case when oi.item_status = 'ready' then oi.quantity else 0 end as done,
+  (oi.item_status = 'ready') as verified,
+  (oi.item_status = 'cancelled') as cancelled
+from orders o
+left join tables t on t.table_id = o.table_id
+join order_items oi on oi.order_id = o.order_id
+left join products p on p.product_id = oi.product_id
+where o.status = 'open'
+  and (@station_id is null or o.checker_station_id = @station_id or o.checker_station_id is null)
+order by o.opened_at, oi.created_at;
 ";
 
                 var map = new Dictionary<Guid, CheckerOrderDto>();
@@ -267,12 +255,13 @@ order by opened_at;
                     var openedAt = reader.GetDateTime(1);
                     var source = reader.IsDBNull(2) ? "" : reader.GetString(2);
 
-                    var productId = reader.GetGuid(3);
+                    var orderItemId = reader.GetGuid(3);
                     var productName = reader.IsDBNull(4) ? "[missing product]" : reader.GetString(4);
 
                     var qty = reader.GetInt32(5);
                     var done = reader.GetInt32(6);
                     var verified = reader.GetBoolean(7);
+                    var cancelled = reader.GetBoolean(8);
 
                     if (!map.TryGetValue(orderId, out var order))
                     {
@@ -281,20 +270,21 @@ order by opened_at;
                             OrderId = orderId,
                             Table = source,
                             CreatedAt = openedAt,
-                            Meals = new List<CheckerMealDto>()
-                        };
-                        map.Add(orderId, order);
-                    }
-
-                    order.Meals.Add(new CheckerMealDto
-                    {
-                        Id = productId,
-                        Name = productName,
-                        Qty = qty,
-                        Done = done,
-                        Verified = verified
-                    });
+                        Meals = new List<CheckerMealDto>()
+                    };
+                    map.Add(orderId, order);
                 }
+
+                order.Meals.Add(new CheckerMealDto
+                {
+                    Id = orderItemId,
+                    Name = productName,
+                    Qty = qty,
+                    Done = done,
+                    Verified = verified,
+                    Cancelled = cancelled
+                });
+            }
 
                 return Results.Json(
                     map.Values.ToList(),
@@ -308,9 +298,9 @@ order by opened_at;
             }
         });
 
-        /* PATCH /api/checker/orders/{orderId}/items/{productId}/ready */
-        app.MapPatch("/api/checker/orders/{orderId:guid}/items/{productId:guid}/ready",
-        async (Guid orderId, Guid productId, NpgsqlDataSource db) =>
+        /* PATCH /api/checker/orders/{orderId}/items/{orderItemId}/ready */
+        app.MapPatch("/api/checker/orders/{orderId:guid}/items/{orderItemId:guid}/ready",
+        async (Guid orderId, Guid orderItemId, NpgsqlDataSource db) =>
         {
             try
             {
@@ -318,12 +308,12 @@ order by opened_at;
 update order_items
    set item_status = 'ready'
  where order_id = @order_id
-   and product_id = @product_id
+   and order_item_id = @order_item_id
    and coalesce(item_status,'') <> 'cancelled';
 ";
                 await using var cmd = db.CreateCommand(sql);
                 cmd.Parameters.AddWithValue("order_id", orderId);
-                cmd.Parameters.AddWithValue("product_id", productId);
+                cmd.Parameters.AddWithValue("order_item_id", orderItemId);
 
                 var affected = await cmd.ExecuteNonQueryAsync();
 
