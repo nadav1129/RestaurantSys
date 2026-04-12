@@ -219,7 +219,11 @@ export default function CheckerPage({ station }: { station?: Station }) {
   };
 
   const dismissOrder = async (orderId: string) => {
-    const res = (await apiFetch(`/api/checker/orders/${orderId}/dismiss`, {
+    const path = station?.stationId
+      ? `/api/checker/orders/${orderId}/dismiss?stationId=${station.stationId}`
+      : `/api/checker/orders/${orderId}/dismiss`;
+
+    const res = (await apiFetch(path, {
       method: "PATCH",
     })) as { ok?: boolean; affected?: number };
 
@@ -482,7 +486,7 @@ export default function CheckerPage({ station }: { station?: Station }) {
               <div>
                 <div className="text-xs font-medium text-gray-500">Orders</div>
                 <div className="text-sm font-semibold text-gray-900">
-                  Active food orders (main)
+                  Active checker orders (main)
                 </div>
                 <div className="text-xs text-gray-500">
                   Ordered by your custom drag-drop priority.
@@ -491,7 +495,7 @@ export default function CheckerPage({ station }: { station?: Station }) {
             </div>
 
             {ordersMain.length === 0 ? (
-              <div className="text-sm text-gray-500">No active food orders in main panel.</div>
+              <div className="text-sm text-gray-500">No active checker orders in main panel.</div>
             ) : (
               <ul className="space-y-3">
                 {ordersMain.map((order, index) => {

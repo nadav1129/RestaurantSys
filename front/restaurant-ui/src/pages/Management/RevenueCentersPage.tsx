@@ -240,11 +240,16 @@ export default function RevenueCentersPage() {
                         <div className="text-sm font-semibold text-[var(--foreground)]">
                           {center.name}
                         </div>
-                        <div className="mt-1 text-xs text-[var(--muted-foreground)]">
+                      <div className="mt-1 text-xs text-[var(--muted-foreground)]">
                           {center.stations.length} assigned station
                           {center.stations.length === 1 ? "" : "s"}
-                          {center.checkerStationName
-                            ? ` · Checker: ${center.checkerStationName}`
+                          {center.checkerStations.length > 0
+                            ? ` · Checkers: ${center.checkerStations
+                                .map(
+                                  (checker) =>
+                                    `${checker.stationName} (${checker.productScope})`
+                                )
+                                .join(", ")}`
                             : " · No checker station selected yet"}
                         </div>
                       </div>

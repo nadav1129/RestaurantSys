@@ -213,6 +213,28 @@ export function RevenueCenterIcon(props: IconProps) {
   );
 }
 
+export function DevicesIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <rect x="4" y="5" width="16" height="14" rx="2.5" />
+      <path d="M8 9.5h8" />
+      <path d="M8 14.5h5" />
+      <path d="M16.5 14.5h.01" />
+    </BaseIcon>
+  );
+}
+
+export function PrinterIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M7 8V4.5h10V8" />
+      <rect x="5" y="8" width="14" height="7" rx="2" />
+      <path d="M8 15v4.5h8V15" />
+      <path d="M16 11.5h.01" />
+    </BaseIcon>
+  );
+}
+
 export function PaletteIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>

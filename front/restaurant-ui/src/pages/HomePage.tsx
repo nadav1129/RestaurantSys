@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Button from "../components/Button";
 import { apiFetch } from "../api/api";
+import type { StoredDeviceConfig } from "../lib/deviceConfig";
 
 type DeviceMode = "fixed" | "personal";
 
@@ -40,6 +41,7 @@ type Props = {
   stations?: Station[]; // optional real data, otherwise we use demo
   workers?: Worker[];
   briefText?: string;
+  configuredDevice?: StoredDeviceConfig | null;
 };
 
 const DEMO_STATIONS: Station[] = [
@@ -61,10 +63,11 @@ export default function HomePage({
   stations,
   workers,
   briefText,
+  configuredDevice,
 }: Props) {
   const [deviceMode, setDeviceMode] = useState<DeviceMode>("fixed");
   const [selectedStationId, setSelectedStationId] = useState<string | null>(
-    DEMO_STATIONS[0]?.id ?? null
+    configuredDevice ? configuredDevice.stationId ?? null : DEMO_STATIONS[0]?.id ?? null
   );
 
   const [showDeviceSelector, setShowDeviceSelector] = useState(false);
@@ -81,11 +84,19 @@ export default function HomePage({
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasConfiguredDevice = !!configuredDevice?.deviceId;
 
   // Load app_users + active shift on mount
   useEffect(() => {
     void loadInitial();
   }, []);
+
+  useEffect(() => {
+    if (configuredDevice) {
+      setSelectedStationId(configuredDevice.stationId ?? null);
+      setDeviceMode("fixed");
+    }
+  }, [configuredDevice]);
 
   async function loadInitial() {
     try {
@@ -129,8 +140,10 @@ export default function HomePage({
       : DEMO_WORKERS;
 
   const selectedStation = useMemo(
-    () => allStations.find((s) => s.id === selectedStationId) ?? allStations[0],
-    [allStations, selectedStationId]
+    () =>
+      allStations.find((s) => s.id === selectedStationId) ??
+      (hasConfiguredDevice ? undefined : allStations[0]),
+    [allStations, hasConfiguredDevice, selectedStationId]
   );
 
   const selectedWorker = useMemo(
@@ -250,7 +263,18 @@ async function handleConfirmShift() {
             <div className="text-xs font-medium uppercase tracking-wide text-gray-500">
               Device
             </div>
-            {deviceMode === "fixed" ? (
+            {hasConfiguredDevice ? (
+              <>
+                <div className="mt-1 text-lg font-semibold text-gray-900">
+                  Fixed Tablet: {configuredDevice.deviceName}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {configuredDevice.stationName
+                    ? `Assigned station: ${configuredDevice.stationName}.`
+                    : "This device is not connected to a station yet."}
+                </div>
+              </>
+            ) : deviceMode === "fixed" ? (
               <>
                 <div className="mt-1 text-lg font-semibold text-gray-900">
                   Fixed Tablet: {selectedStation?.name ?? "Select station"}
@@ -272,6 +296,7 @@ async function handleConfirmShift() {
             )}
           </div>
 
+          {!hasConfiguredDevice ? (
           <div className="flex flex-col items-stretch gap-2 sm:items-end">
             {/* Quick simulation toggle */}
             <div className="flex items-center gap-2 text-xs text-gray-600">
@@ -314,9 +339,10 @@ async function handleConfirmShift() {
                 : "Change mode / device"}
             </Button>
           </div>
+          ) : null}
         </div>
 
-        {showDeviceSelector && (
+        {!hasConfiguredDevice && showDeviceSelector && (
           <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
               Device configuration
@@ -436,8 +462,17 @@ async function handleConfirmShift() {
                 Fixed Tablet
               </div>
               <div className="mt-1 text-[11px] text-gray-500">
-                This tablet is bound to <b>{selectedStation?.name}</b>. Personal
-                stats will be visible on staff personal devices.
+                {hasConfiguredDevice ? (
+                  <>
+                    This tablet is bound to <b>{configuredDevice.stationName ?? "no station yet"}</b>.
+                    Personal stats will be visible on staff personal devices.
+                  </>
+                ) : (
+                  <>
+                    This tablet is bound to <b>{selectedStation?.name}</b>. Personal
+                    stats will be visible on staff personal devices.
+                  </>
+                )}
               </div>
             </div>
           )}

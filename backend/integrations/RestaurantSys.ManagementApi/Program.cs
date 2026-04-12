@@ -139,6 +139,7 @@ app.MapPricesEndpoints();
 app.MapSettingsEndpoints();
 app.MapAnalyticsEndpoints();
 app.MapRevenueCentersEndpoints();
+app.MapDevicesEndpoints();
 app.MapListStationsEndpoints();
 app.MapTableStationsEndpoints();
 

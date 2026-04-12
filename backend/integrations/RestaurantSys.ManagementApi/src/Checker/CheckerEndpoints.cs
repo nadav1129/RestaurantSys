@@ -19,7 +19,8 @@ public static class CheckerEndpoints
                       s.station_id,
                       s.checker_revenue_center_id,
                       rc.name,
-                      s.checker_print_enabled
+                      s.checker_print_enabled,
+                      s.checker_product_scope
                     from stations s
                     left join revenue_centers rc
                       on rc.revenue_center_id = s.checker_revenue_center_id
@@ -42,7 +43,8 @@ public static class CheckerEndpoints
                     StationId = reader.GetGuid(0),
                     RevenueCenterId = reader.IsDBNull(1) ? (Guid?)null : reader.GetGuid(1),
                     RevenueCenterName = reader.IsDBNull(2) ? null : reader.GetString(2),
-                    PrintEnabled = !reader.IsDBNull(3) && reader.GetBoolean(3)
+                    PrintEnabled = !reader.IsDBNull(3) && reader.GetBoolean(3),
+                    ProductScope = reader.IsDBNull(4) ? "both" : reader.GetString(4)
                 }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
             }
             catch (Exception ex)
@@ -86,6 +88,23 @@ public static class CheckerEndpoints
                     else if (printEnabledEl.ValueKind != JsonValueKind.Null)
                     {
                         return Results.BadRequest(new { error = "printEnabled must be a boolean." });
+                    }
+                }
+
+                string? productScope = null;
+                if (body.TryGetProperty("productScope", out var productScopeEl))
+                {
+                    if (productScopeEl.ValueKind == JsonValueKind.String)
+                    {
+                        productScope = NormalizeCheckerProductScope(productScopeEl.GetString());
+                        if (productScope is null)
+                        {
+                            return Results.BadRequest(new { error = "productScope must be food, drinks, or both." });
+                        }
+                    }
+                    else if (productScopeEl.ValueKind != JsonValueKind.Null)
+                    {
+                        return Results.BadRequest(new { error = "productScope must be a string." });
                     }
                 }
 
@@ -133,6 +152,8 @@ public static class CheckerEndpoints
                     setParts.Add("checker_revenue_center_id = @revenue_center_id");
                 if (printEnabled is not null)
                     setParts.Add("checker_print_enabled = @print_enabled");
+                if (productScope is not null)
+                    setParts.Add("checker_product_scope = @product_scope");
 
                 if (setParts.Count == 0)
                 {
@@ -144,11 +165,12 @@ public static class CheckerEndpoints
                     update stations
                     set {string.Join(", ", setParts)}
                     where station_id = @station_id
-                    returning station_id, checker_revenue_center_id, checker_print_enabled;
+                    returning station_id, checker_revenue_center_id, checker_print_enabled, checker_product_scope;
                     """;
 
                 Guid? savedRevenueCenterId = null;
                 bool savedPrintEnabled = false;
+                string savedProductScope = "both";
 
                 await using (var updateCmd = new NpgsqlCommand(updateSql, conn, tx))
                 {
@@ -162,11 +184,16 @@ public static class CheckerEndpoints
                     {
                         updateCmd.Parameters.AddWithValue("print_enabled", printEnabled.Value);
                     }
+                    if (productScope is not null)
+                    {
+                        updateCmd.Parameters.AddWithValue("product_scope", productScope);
+                    }
 
                     await using var reader = await updateCmd.ExecuteReaderAsync();
                     await reader.ReadAsync();
                     savedRevenueCenterId = reader.IsDBNull(1) ? (Guid?)null : reader.GetGuid(1);
                     savedPrintEnabled = !reader.IsDBNull(2) && reader.GetBoolean(2);
+                    savedProductScope = reader.IsDBNull(3) ? "both" : reader.GetString(3);
                 }
 
                 string? revenueCenterName = null;
@@ -191,12 +218,13 @@ public static class CheckerEndpoints
                     StationId = stationId,
                     RevenueCenterId = savedRevenueCenterId,
                     RevenueCenterName = revenueCenterName,
-                    PrintEnabled = savedPrintEnabled
+                    PrintEnabled = savedPrintEnabled,
+                    ProductScope = savedProductScope
                 }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
             }
             catch (PostgresException ex) when (ex.SqlState == "23505")
             {
-                return Results.BadRequest(new { error = "This revenue center is already assigned to another checker station." });
+                return Results.BadRequest(new { error = "This revenue center already has a checker station with the same product scope." });
             }
             catch (Exception ex)
             {
@@ -239,7 +267,12 @@ left join tables t on t.table_id = o.table_id
 join order_items oi on oi.order_id = o.order_id
 left join products p on p.product_id = oi.product_id
 where o.status = 'open'
-  and (@station_id is null or o.checker_station_id = @station_id or o.checker_station_id is null)
+  and coalesce(oi.item_status, '') <> 'served'
+  and (
+    @station_id is null
+    or coalesce(oi.checker_station_id, o.checker_station_id) = @station_id
+    or (@station_id is null and coalesce(oi.checker_station_id, o.checker_station_id) is null)
+  )
 order by o.opened_at, oi.created_at;
 ";
 
@@ -331,18 +364,33 @@ update order_items
 
         /* PATCH /api/checker/orders/{orderId}/dismiss */
         app.MapPatch("/api/checker/orders/{orderId:guid}/dismiss",
-        async (Guid orderId, NpgsqlDataSource db) =>
+        async (Guid orderId, HttpRequest req, NpgsqlDataSource db) =>
         {
             try
             {
+                Guid? stationId = null;
+                if (Guid.TryParse(req.Query["stationId"], out var parsedStationId))
+                {
+                    stationId = parsedStationId;
+                }
+
                 const string sql = @"
-update orders
-   set status = 'closed'
+update order_items
+   set item_status = 'served'
  where order_id = @order_id
-   and status = 'open';
+   and coalesce(item_status,'') not in ('cancelled', 'served')
+   and (
+         @station_id is null
+      or coalesce(checker_station_id, (
+            select checker_station_id
+            from orders
+            where order_id = @order_id
+         )) = @station_id
+   );
 ";
                 await using var cmd = db.CreateCommand(sql);
                 cmd.Parameters.AddWithValue("order_id", orderId);
+                cmd.Parameters.AddWithValue("station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)stationId ?? DBNull.Value);
 
                 var affected = await cmd.ExecuteNonQueryAsync();
 
@@ -358,5 +406,16 @@ update orders
             }
         });
 
+    }
+
+    private static string? NormalizeCheckerProductScope(string? raw)
+    {
+        return raw?.Trim().ToLowerInvariant() switch
+        {
+            "food" => "food",
+            "drinks" => "drinks",
+            "both" => "both",
+            _ => null
+        };
     }
 }

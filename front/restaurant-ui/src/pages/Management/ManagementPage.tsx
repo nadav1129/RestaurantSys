@@ -8,8 +8,10 @@ import type { DashboardTab } from "./DashboardPage";
 import StaffPage from "./StaffPage";
 import AnalyticsPage from "./AnalyticsPage";
 import RevenueCentersPage from "./RevenueCentersPage";
+import DevicesPage from "./DevicesPage";
 import {
   AnalyticsIcon,
+  DevicesIcon,
   ListsIcon,
   ManagementIcon,
   MenuIcon,
@@ -27,6 +29,7 @@ const tabs = [
   { id: "analytics", label: "Analytics", icon: AnalyticsIcon },
   { id: "menu", label: "Menu Builder", icon: MenuIcon },
   { id: "stations", label: "Stations", icon: StationsIcon },
+  { id: "devices", label: "Devices", icon: DevicesIcon },
   { id: "revenue-centers", label: "Revenue Centers", icon: RevenueCenterIcon },
   { id: "lists", label: "Lists", icon: ListsIcon },
   { id: "staff", label: "Staff", icon: StaffIcon },
@@ -100,6 +103,7 @@ export default function ManagementPage({
         {activeTab === "analytics" && <AnalyticsPage />}
         {activeTab === "menu" && <MenuPage />}
         {activeTab === "stations" && <StationsPage />}
+        {activeTab === "devices" && <DevicesPage />}
         {activeTab === "revenue-centers" && <RevenueCentersPage />}
         {activeTab === "lists" && <ListsPage />}
         {activeTab === "staff" && <StaffPage />}

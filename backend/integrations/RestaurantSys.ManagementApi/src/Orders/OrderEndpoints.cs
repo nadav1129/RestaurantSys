@@ -111,7 +111,10 @@ public static class OrderEndpoints
                     }
                 }
 
-                var route = await OrderRoutingResolver.ResolveAsync(conn, originStationId, tx);
+                Guid? defaultCheckerStationId = null;
+                Guid? revenueCenterId = null;
+                var distinctCheckerStationIds = new HashSet<Guid>();
+                var itemRoutes = new List<(Guid ProductId, int Qty, int PriceCents, Guid? CheckerStationId)>();
 
                 Guid orderId;
 
@@ -157,7 +160,7 @@ public static class OrderEndpoints
                         await using var insertCmd = new NpgsqlCommand(INSERT_QUICK, conn, tx);
                         insertCmd.Parameters.AddWithValue("shift_id", shiftId);
                         insertCmd.Parameters.AddWithValue("origin_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)originStationId ?? DBNull.Value);
-                        insertCmd.Parameters.AddWithValue("checker_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)route.CheckerStationId ?? DBNull.Value);
+                        insertCmd.Parameters.AddWithValue("checker_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, DBNull.Value);
                         insertCmd.Parameters.AddWithValue("guest_name", (object?)guestName ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("guest_phone", (object?)guestPhone ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("diners_count", (object?)dinersCount ?? DBNull.Value);
@@ -206,7 +209,7 @@ public static class OrderEndpoints
                         insertCmd.Parameters.AddWithValue("shift_id", shiftId);
                         insertCmd.Parameters.AddWithValue("table_id", tableId.Value);
                         insertCmd.Parameters.AddWithValue("origin_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)originStationId ?? DBNull.Value);
-                        insertCmd.Parameters.AddWithValue("checker_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)route.CheckerStationId ?? DBNull.Value);
+                        insertCmd.Parameters.AddWithValue("checker_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, DBNull.Value);
                         insertCmd.Parameters.AddWithValue("guest_name", (object?)guestName ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("guest_phone", (object?)guestPhone ?? DBNull.Value);
                         insertCmd.Parameters.AddWithValue("diners_count", (object?)dinersCount ?? DBNull.Value);
@@ -225,21 +228,13 @@ public static class OrderEndpoints
                 const string updateRoutingSql = @"
                     update orders
                     set origin_station_id = coalesce(origin_station_id, @origin_station_id),
-                        checker_station_id = coalesce(checker_station_id, @checker_station_id)
+                        checker_station_id = @checker_station_id
                     where order_id = @order_id;";
-
-                await using (var updateRoutingCmd = new NpgsqlCommand(updateRoutingSql, conn, tx))
-                {
-                    updateRoutingCmd.Parameters.AddWithValue("origin_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)originStationId ?? DBNull.Value);
-                    updateRoutingCmd.Parameters.AddWithValue("checker_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)route.CheckerStationId ?? DBNull.Value);
-                    updateRoutingCmd.Parameters.AddWithValue("order_id", orderId);
-                    await updateRoutingCmd.ExecuteNonQueryAsync();
-                }
 
                 /* Insert items */
                 const string insertItemSql = @"
-            insert into order_items (order_id, product_id, quantity, price_cents, item_status)
-            values (@order_id, @product_id, @quantity, @price, 'in_progress');";
+            insert into order_items (order_id, product_id, quantity, price_cents, item_status, checker_station_id)
+            values (@order_id, @product_id, @quantity, @price, 'in_progress', @checker_station_id);";
 
                 foreach (var item in itemsEl.EnumerateArray())
                 {
@@ -269,13 +264,29 @@ public static class OrderEndpoints
                         else if (p is decimal pd) price = (int)Math.Round(pd * 100m, MidpointRounding.AwayFromZero);
                     }
 
+                    var route = await OrderRoutingResolver.ResolveForProductAsync(conn, originStationId, productId, tx);
+                    revenueCenterId ??= route.RevenueCenterId;
+                    if (defaultCheckerStationId is null)
+                        defaultCheckerStationId = route.CheckerStationId;
+                    if (route.CheckerStationId is Guid checkerStationId)
+                        distinctCheckerStationIds.Add(checkerStationId);
+
                     await using var itemCmd = new NpgsqlCommand(insertItemSql, conn, tx);
                     itemCmd.Parameters.AddWithValue("order_id", orderId);
                     itemCmd.Parameters.AddWithValue("product_id", productId);
                     itemCmd.Parameters.AddWithValue("quantity", qty);
                     itemCmd.Parameters.AddWithValue("price", price);
+                    itemCmd.Parameters.AddWithValue("checker_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)route.CheckerStationId ?? DBNull.Value);
 
                     await itemCmd.ExecuteNonQueryAsync();
+                }
+
+                await using (var updateRoutingCmd = new NpgsqlCommand(updateRoutingSql, conn, tx))
+                {
+                    updateRoutingCmd.Parameters.AddWithValue("origin_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)originStationId ?? DBNull.Value);
+                    updateRoutingCmd.Parameters.AddWithValue("checker_station_id", NpgsqlTypes.NpgsqlDbType.Uuid, (object?)defaultCheckerStationId ?? DBNull.Value);
+                    updateRoutingCmd.Parameters.AddWithValue("order_id", orderId);
+                    await updateRoutingCmd.ExecuteNonQueryAsync();
                 }
 
                 await tx.CommitAsync();
@@ -284,8 +295,9 @@ public static class OrderEndpoints
                     new
                     {
                         orderId,
-                        checkerStationId = route.CheckerStationId,
-                        revenueCenterId = route.RevenueCenterId
+                        checkerStationId = distinctCheckerStationIds.Count == 1 ? distinctCheckerStationIds.First() : defaultCheckerStationId,
+                        checkerStationIds = distinctCheckerStationIds.ToArray(),
+                        revenueCenterId
                     },
                     new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }
                 );

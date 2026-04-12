@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Shell from "./layouts/Shell";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
@@ -11,15 +11,29 @@ import ServicePage from "./pages/Service/ServicePage";
 import ManagementPage from "./pages/Management/ManagementPage";
 import OrdersPage from "./pages/OrdersPage";
 import SettingsPage from "./pages/SettingsPage";
-import type { Page } from "./types";
+import {
+  loadStoredDeviceConfig,
+  saveStoredDeviceConfig,
+  type StoredDeviceConfig,
+} from "./lib/deviceConfig";
+import type { ManagedDevice, Page } from "./types";
 
 export default function App() {
-  const [hasEnteredApp, setHasEnteredApp] = useState(false);
+  const [deviceConfig, setDeviceConfig] = useState<StoredDeviceConfig | null>(
+    () => loadStoredDeviceConfig()
+  );
+  const [hasEnteredApp, setHasEnteredApp] = useState(
+    () => loadStoredDeviceConfig() !== null
+  );
   const [page, setPage] = useState<Page>("home");
   const [activeStationId, setActiveStationId] = useState<string | undefined>(
-    undefined
+    deviceConfig?.stationId ?? undefined
   );
   const [currentTable, setCurrentTable] = useState<string>("none");
+
+  useEffect(() => {
+    setActiveStationId(deviceConfig?.stationId ?? undefined);
+  }, [deviceConfig?.stationId]);
 
   const openOrderForTable = (tableId: string) => {
     setCurrentTable(tableId);
@@ -29,7 +43,7 @@ export default function App() {
   const renderPage = () => {
     switch (page) {
       case "home":
-        return <HomePage />;
+        return <HomePage configuredDevice={deviceConfig} />;
       case "assistant":
         return <ChatAssistantPage />;
       case "login":
@@ -40,6 +54,7 @@ export default function App() {
         return (
           <ServicePage
             activeStationId={activeStationId}
+            autoSelectFirstStation={!deviceConfig}
             onStationChange={setActiveStationId}
             onOpenOrderForTable={openOrderForTable}
           />
@@ -62,8 +77,19 @@ export default function App() {
     }
   };
 
+  const handleDeviceConfigured = (device: ManagedDevice) => {
+    const next = saveStoredDeviceConfig(device);
+    setDeviceConfig(next);
+    setHasEnteredApp(true);
+  };
+
   if (!hasEnteredApp) {
-    return <LandingPage onContinue={() => setHasEnteredApp(true)} />;
+    return (
+      <LandingPage
+        onConfigured={handleDeviceConfigured}
+        onSkip={() => setHasEnteredApp(true)}
+      />
+    );
   }
 
   return (

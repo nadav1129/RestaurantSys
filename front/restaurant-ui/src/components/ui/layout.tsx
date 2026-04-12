@@ -63,9 +63,11 @@ export function SectionCard({
   className?: string;
   contentClassName?: string;
   }) {
+  const hasHeader = !!(title || description || actions);
+
   return (
     <Card className={cn("overflow-hidden", className)}>
-      {(title || description || actions) && (
+      {hasHeader && (
         <CardHeader className="flex flex-col gap-4 border-b border-[var(--border)] bg-[color:rgba(255,255,255,0.5)] lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
             {title ? <CardTitle>{title}</CardTitle> : null}
@@ -74,7 +76,14 @@ export function SectionCard({
           {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
         </CardHeader>
       )}
-      <CardContent className={cn("p-5", contentClassName)}>{children}</CardContent>
+      <CardContent
+        className={cn(
+          hasHeader ? "p-5 pt-5 lg:p-6 lg:pt-6" : "p-5 lg:p-6",
+          contentClassName
+        )}
+      >
+        {children}
+      </CardContent>
     </Card>
   );
 }

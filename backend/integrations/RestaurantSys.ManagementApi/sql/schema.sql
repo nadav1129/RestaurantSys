@@ -147,15 +147,64 @@ alter table stations
 alter table stations
   add column if not exists checker_print_enabled boolean not null default false;
 
+alter table stations
+  add column if not exists checker_product_scope text not null default 'both';
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'stations_checker_product_scope_check'
+  ) then
+    alter table stations
+      add constraint stations_checker_product_scope_check
+      check (checker_product_scope in ('food', 'drinks', 'both'));
+  end if;
+end $$;
+
 create index if not exists ix_stations_revenue_center
   on stations(revenue_center_id);
 
 create index if not exists ix_stations_checker_revenue_center
   on stations(checker_revenue_center_id);
 
-create unique index if not exists ux_stations_checker_revenue_center
-  on stations(checker_revenue_center_id)
+drop index if exists ux_stations_checker_revenue_center;
+
+create unique index if not exists ux_stations_checker_revenue_center_scope
+  on stations(checker_revenue_center_id, checker_product_scope)
   where station_type = 'Checker' and checker_revenue_center_id is not null;
+
+/* Devices + printers */
+create table if not exists printers (
+  printer_id   uuid primary key default gen_random_uuid(),
+  printer_name text not null unique check (length(btrim(printer_name)) > 0),
+  created_at   timestamptz not null default now()
+);
+
+create table if not exists device_groups (
+  device_group_id uuid primary key default gen_random_uuid(),
+  name            text not null unique check (length(btrim(name)) > 0),
+  station_id      uuid references stations(station_id) on delete set null,
+  created_at      timestamptz not null default now()
+);
+
+create table if not exists devices (
+  device_id        uuid primary key default gen_random_uuid(),
+  device_name      text not null unique check (length(btrim(device_name)) > 0),
+  printer_id       uuid references printers(printer_id) on delete set null,
+  device_group_id  uuid references device_groups(device_group_id) on delete set null,
+  created_at       timestamptz not null default now()
+);
+
+create index if not exists ix_device_groups_station
+  on device_groups(station_id);
+
+create index if not exists ix_devices_printer
+  on devices(printer_id);
+
+create index if not exists ix_devices_group
+  on devices(device_group_id);
 
 /* ------------------------------------------------------------
    Lists (supports two types: 'Tables' and 'Names')
@@ -446,6 +495,11 @@ CREATE INDEX IF NOT EXISTS ix_order_items_order   ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS ix_order_items_product ON order_items(product_id);
 CREATE INDEX IF NOT EXISTS ix_order_items_worker  ON order_items(entered_by_worker_id);
 CREATE INDEX IF NOT EXISTS ix_order_items_cancel_request_status ON order_items(cancel_request_status);
+
+alter table if exists public.order_items
+  add column if not exists checker_station_id uuid references stations(station_id) on delete set null;
+
+create index if not exists ix_order_items_checker_station on order_items(checker_station_id);
 
 alter table if exists public.order_items
   add column if not exists cancel_request_status text not null default 'none';

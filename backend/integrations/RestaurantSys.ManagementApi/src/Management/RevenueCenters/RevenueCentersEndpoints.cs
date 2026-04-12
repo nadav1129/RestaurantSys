@@ -19,53 +19,88 @@ public static class RevenueCentersEndpoints
         {
             try
             {
-                const string sql = """
+                const string centersSql = """
                     select
-                      rc.revenue_center_id,
-                      rc.name,
-                      checker.station_id as checker_station_id,
-                      checker.station_name as checker_station_name,
-                      member.station_id as member_station_id,
-                      member.station_name as member_station_name,
-                      member.station_type as member_station_type
+                      revenue_center_id,
+                      name
                     from revenue_centers rc
-                    left join stations checker
-                      on checker.station_type = 'Checker'
-                     and checker.checker_revenue_center_id = rc.revenue_center_id
-                    left join stations member
-                      on member.revenue_center_id = rc.revenue_center_id
-                     and member.station_type in ('Bar', 'Floor')
-                    order by lower(rc.name), lower(member.station_name) nulls last;
+                    order by lower(name);
                     """;
 
                 var map = new Dictionary<Guid, RevenueCenterDto>();
 
-                await using var cmd = db.CreateCommand(sql);
-                await using var reader = await cmd.ExecuteReaderAsync();
-
-                while (await reader.ReadAsync())
+                await using (var centersCmd = db.CreateCommand(centersSql))
                 {
-                    var revenueCenterId = reader.GetGuid(0);
-                    if (!map.TryGetValue(revenueCenterId, out var dto))
+                    await using var reader = await centersCmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
                     {
-                        dto = new RevenueCenterDto
+                        var dto = new RevenueCenterDto
                         {
-                            RevenueCenterId = revenueCenterId,
+                            RevenueCenterId = reader.GetGuid(0),
                             Name = reader.GetString(1),
-                            CheckerStationId = reader.IsDBNull(2) ? (Guid?)null : reader.GetGuid(2),
-                            CheckerStationName = reader.IsDBNull(3) ? null : reader.GetString(3),
+                            CheckerStations = new List<CheckerRevenueCenterStationDto>(),
                             Stations = new List<RevenueCenterStationDto>()
                         };
-                        map.Add(revenueCenterId, dto);
+                        map[dto.RevenueCenterId] = dto;
                     }
+                }
 
-                    if (!reader.IsDBNull(4))
+                const string stationMembersSql = """
+                    select
+                      revenue_center_id,
+                      station_id,
+                      station_name,
+                      station_type
+                    from stations
+                    where revenue_center_id is not null
+                      and station_type in ('Bar', 'Floor')
+                    order by lower(station_name);
+                    """;
+
+                await using (var stationsCmd = db.CreateCommand(stationMembersSql))
+                {
+                    await using var reader = await stationsCmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
                     {
+                        var revenueCenterId = reader.GetGuid(0);
+                        if (!map.TryGetValue(revenueCenterId, out var dto))
+                            continue;
+
                         dto.Stations.Add(new RevenueCenterStationDto
                         {
-                            StationId = reader.GetGuid(4),
-                            StationName = reader.GetString(5),
-                            StationType = reader.GetString(6)
+                            StationId = reader.GetGuid(1),
+                            StationName = reader.GetString(2),
+                            StationType = reader.GetString(3)
+                        });
+                    }
+                }
+
+                const string checkerSql = """
+                    select
+                      checker_revenue_center_id,
+                      station_id,
+                      station_name,
+                      checker_product_scope
+                    from stations
+                    where station_type = 'Checker'
+                      and checker_revenue_center_id is not null
+                    order by lower(station_name), station_id;
+                    """;
+
+                await using (var checkerCmd = db.CreateCommand(checkerSql))
+                {
+                    await using var reader = await checkerCmd.ExecuteReaderAsync();
+                    while (await reader.ReadAsync())
+                    {
+                        var revenueCenterId = reader.GetGuid(0);
+                        if (!map.TryGetValue(revenueCenterId, out var dto))
+                            continue;
+
+                        dto.CheckerStations.Add(new CheckerRevenueCenterStationDto
+                        {
+                            StationId = reader.GetGuid(1),
+                            StationName = reader.GetString(2),
+                            ProductScope = reader.IsDBNull(3) ? "both" : reader.GetString(3)
                         });
                     }
                 }
@@ -106,6 +141,7 @@ public static class RevenueCentersEndpoints
                 {
                     RevenueCenterId = reader.GetGuid(0),
                     Name = reader.GetString(1),
+                    CheckerStations = new List<CheckerRevenueCenterStationDto>(),
                     Stations = new List<RevenueCenterStationDto>()
                 };
 
@@ -151,6 +187,7 @@ public static class RevenueCentersEndpoints
                 {
                     RevenueCenterId = reader.GetGuid(0),
                     Name = reader.GetString(1),
+                    CheckerStations = new List<CheckerRevenueCenterStationDto>(),
                     Stations = new List<RevenueCenterStationDto>()
                 }, JsonOptions);
             }

@@ -325,9 +325,15 @@ namespace RestaurantSys.Api
     {
         public Guid RevenueCenterId { get; init; }
         public string Name { get; init; } = string.Empty;
-        public Guid? CheckerStationId { get; init; }
-        public string? CheckerStationName { get; init; }
+        public List<CheckerRevenueCenterStationDto> CheckerStations { get; init; } = new();
         public List<RevenueCenterStationDto> Stations { get; init; } = new();
+    }
+
+    public sealed class CheckerRevenueCenterStationDto
+    {
+        public Guid StationId { get; init; }
+        public string StationName { get; init; } = string.Empty;
+        public string ProductScope { get; init; } = "both";
     }
 
     public sealed class CreateRevenueCenterRequest
@@ -351,6 +357,68 @@ namespace RestaurantSys.Api
         public Guid? RevenueCenterId { get; init; }
         public string? RevenueCenterName { get; init; }
         public bool PrintEnabled { get; init; }
+        public string ProductScope { get; init; } = "both";
+    }
+
+    /* ============ Devices ============ */
+    public sealed class PrinterDto
+    {
+        public Guid PrinterId { get; init; }
+        public string PrinterName { get; init; } = string.Empty;
+    }
+
+    public sealed class CreatePrinterRequest
+    {
+        public string? PrinterName { get; set; }
+    }
+
+    public sealed class DeviceGroupDto
+    {
+        public Guid DeviceGroupId { get; init; }
+        public string Name { get; init; } = string.Empty;
+        public Guid? StationId { get; init; }
+        public string? StationName { get; init; }
+        public string? StationType { get; init; }
+        public int DeviceCount { get; init; }
+    }
+
+    public sealed class CreateDeviceGroupRequest
+    {
+        public string? Name { get; set; }
+        public Guid? StationId { get; set; }
+    }
+
+    public sealed class UpdateDeviceGroupRequest
+    {
+        public string? Name { get; set; }
+        public Guid? StationId { get; set; }
+    }
+
+    public sealed class DeviceDto
+    {
+        public Guid DeviceId { get; init; }
+        public string DeviceName { get; init; } = string.Empty;
+        public Guid? PrinterId { get; init; }
+        public string? PrinterName { get; init; }
+        public Guid? DeviceGroupId { get; init; }
+        public string? DeviceGroupName { get; init; }
+        public Guid? StationId { get; init; }
+        public string? StationName { get; init; }
+        public string? StationType { get; init; }
+    }
+
+    public sealed class CreateDeviceRequest
+    {
+        public string? DeviceName { get; set; }
+        public Guid? PrinterId { get; set; }
+        public Guid? DeviceGroupId { get; set; }
+    }
+
+    public sealed class UpdateDeviceRequest
+    {
+        public string? DeviceName { get; set; }
+        public Guid? PrinterId { get; set; }
+        public Guid? DeviceGroupId { get; set; }
     }
 
     /* ============ Lists ============ */

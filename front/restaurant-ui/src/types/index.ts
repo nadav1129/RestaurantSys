@@ -56,11 +56,16 @@ export type RevenueCenterStation = {
   stationType: Extract<StationType, "Bar" | "Floor">;
 };
 
+export type CheckerRevenueCenterStation = {
+  stationId: string;
+  stationName: string;
+  productScope: "food" | "drinks" | "both";
+};
+
 export type RevenueCenter = {
   revenueCenterId: string;
   name: string;
-  checkerStationId?: string | null;
-  checkerStationName?: string | null;
+  checkerStations: CheckerRevenueCenterStation[];
   stations: RevenueCenterStation[];
 };
 
@@ -69,6 +74,33 @@ export type CheckerStationSettings = {
   revenueCenterId?: string | null;
   revenueCenterName?: string | null;
   printEnabled: boolean;
+  productScope: "food" | "drinks" | "both";
+};
+
+export type Printer = {
+  printerId: string;
+  printerName: string;
+};
+
+export type DeviceGroup = {
+  deviceGroupId: string;
+  name: string;
+  stationId?: string | null;
+  stationName?: string | null;
+  stationType?: StationType | null;
+  deviceCount: number;
+};
+
+export type ManagedDevice = {
+  deviceId: string;
+  deviceName: string;
+  printerId?: string | null;
+  printerName?: string | null;
+  deviceGroupId?: string | null;
+  deviceGroupName?: string | null;
+  stationId?: string | null;
+  stationName?: string | null;
+  stationType?: StationType | null;
 };
 
 export type Meal = {

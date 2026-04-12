@@ -26,13 +26,21 @@ public static class OrderRouteEndpoints
                 else if (TryGetGuid(body, "stationId", out var parsedStationId) && parsedStationId != Guid.Empty)
                     originStationId = parsedStationId;
 
+                Guid? productId = null;
+                if (TryGetGuid(body, "productId", out var parsedProductId) && parsedProductId != Guid.Empty)
+                    productId = parsedProductId;
+
                 await using var conn = await db.OpenConnectionAsync();
-                var route = await OrderRoutingResolver.ResolveAsync(conn, originStationId);
+                var route = productId is Guid pid
+                    ? await OrderRoutingResolver.ResolveForProductAsync(conn, originStationId, pid)
+                    : await OrderRoutingResolver.ResolveAsync(conn, originStationId);
 
                 return Results.Json(new
                 {
                     originStationId,
+                    productId,
                     revenueCenterId = route.RevenueCenterId,
+                    productScope = route.ProductScope,
                     checkerStationId = route.CheckerStationId,
                     checkerStationName = route.CheckerStationName
                 }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });

@@ -2,7 +2,7 @@ import { useState } from "react";
 import Button from "../components/Button";
 import { LightningIcon, OrdersIcon, TableIcon } from "../components/icons";
 import { PageContainer, SectionCard, StatCard } from "../components/ui/layout";
-import { PosActionStrip, PosMetricCircle, PosStatusPill } from "../components/ui/pos";
+import { PosMetricCircle, PosStatusPill } from "../components/ui/pos";
 import type { InventoryItem, Station, TableInfo } from "../types";
 import { formatMoney } from "../utils/money";
 
@@ -23,7 +23,7 @@ export default function StationServicePage({
     <PageContainer className="space-y-6">
       <SectionCard
         title={`${station.stationType} · ${station.stationName}`}
-        description="A station workspace for table scanning, order opening, and inventory awareness."
+        contentClassName="pt-4 lg:pt-4"
         actions={
           <div className="flex flex-wrap gap-2">
             <Button
@@ -66,7 +66,7 @@ export default function StationServicePage({
       {showInv ? (
         <SectionCard
           title="Inventory"
-          description="A lighter snapshot of station-side inventory."
+          contentClassName="pt-4 lg:pt-4"
         >
           {inventory.length === 0 ? (
             <div className="text-sm text-[var(--muted-foreground)]">No inventory items yet.</div>
@@ -95,14 +95,13 @@ export default function StationServicePage({
 
       <SectionCard
         title="Tables"
-        description={`Open a table from ${station.stationName} to continue into the existing order flow.`}
+        contentClassName="pt-4 lg:pt-4"
+        actions={
+          <Button variant="secondary">
+            Map
+          </Button>
+        }
       >
-        <PosActionStrip className="mb-5">
-          <PosStatusPill tone="accent">{station.stationType}</PosStatusPill>
-          <PosStatusPill>{tables.length} assigned tables</PosStatusPill>
-          <PosStatusPill>{showInv ? "Inventory visible" : "Inventory hidden"}</PosStatusPill>
-        </PosActionStrip>
-
         {tables.length === 0 ? (
           <div className="text-sm text-[var(--muted-foreground)]">
             No tables are assigned to this station yet.

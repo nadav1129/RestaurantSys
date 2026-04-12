@@ -9,10 +9,12 @@ import HostessPage from "./HostessPage";
 
 export default function ServicePage({
   activeStationId,
+  autoSelectFirstStation = true,
   onStationChange,
   onOpenOrderForTable,
 }: {
   activeStationId?: string;
+  autoSelectFirstStation?: boolean;
   onStationChange?: (id: string) => void;
   onOpenOrderForTable: (tableNum: string) => void;
 }) {
@@ -28,7 +30,7 @@ export default function ServicePage({
           method: "GET",
         })) as Station[] | null;
         setStations(data ?? []);
-        if (!activeStationId && (data?.length ?? 0) > 0) {
+        if (!activeStationId && autoSelectFirstStation && (data?.length ?? 0) > 0) {
           setActiveId(data![0].stationId);
         }
       } catch (err) {
@@ -37,11 +39,12 @@ export default function ServicePage({
         setLoading(false);
       }
     })();
-  }, [activeStationId]);
+  }, [activeStationId, autoSelectFirstStation]);
 
   useEffect(() => {
     if (activeStationId) setActiveId(activeStationId);
-  }, [activeStationId]);
+    else if (!autoSelectFirstStation) setActiveId(undefined);
+  }, [activeStationId, autoSelectFirstStation]);
 
   const activeStation = useMemo(
     () => stations.find((s) => s.stationId === activeId),
